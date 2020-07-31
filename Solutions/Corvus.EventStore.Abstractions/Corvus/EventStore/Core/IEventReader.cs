@@ -18,8 +18,8 @@ namespace Corvus.EventStore.Core
         /// <param name="fromSequenceNumber">The minimum <see cref="IEvent.SequenceNumber"/> to retrieve.</param>
         /// <param name="toSequenceNumber">The maximum <see cref="IEvent.SequenceNumber"/> to retreive.</param>
         /// <param name="maxItems">The maximum number of items to return.</param>
-        /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
-        Task<EventReaderResult> ReadAsync(
+        /// <returns>The results, contained in an <see cref="IEventReaderResult"/>.</returns>
+        ValueTask<IEventReaderResult> ReadAsync(
             string aggregateId,
             long fromSequenceNumber,
             long toSequenceNumber,
@@ -30,7 +30,7 @@ namespace Corvus.EventStore.Core
         /// </summary>
         /// <param name="continuationToken">A continuation token returned from a previous call that can be used to
         /// obtain the next set of results.</param>
-        /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
-        ValueTask<EventReaderResult> ReadAsync(string continuationToken);
+        /// <returns>The results, contained in an <see cref="IEventReaderResult"/>.</returns>
+        ValueTask<IEventReaderResult> ReadAsync(string continuationToken);
     }
 }
