@@ -4,7 +4,6 @@
 
 namespace Corvus.EventStore.Snapshots
 {
-    using System;
     using System.Threading.Tasks;
 
     /// <summary>

@@ -18,7 +18,7 @@ namespace Corvus.EventStore.Snapshots
         /// <summary>
         /// Gets the sequence number for the snapshot.
         /// </summary>
-        long SequenceId { get; }
+        long SequenceNumber { get; }
 
         /// <summary>
         /// Gets the memoized version of the aggregate for the snapshot.

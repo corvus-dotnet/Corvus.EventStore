@@ -31,6 +31,11 @@ namespace Corvus.EventStore.Core
         string PartitionKey { get; }
 
         /// <summary>
+        /// Gets the nominal wall clock timestamp for the event as determined by the creator of the event.
+        /// </summary>
+        long Timestamp { get; }
+
+        /// <summary>
         /// Gets the sequence number for the event.
         /// </summary>
         /// <remarks>

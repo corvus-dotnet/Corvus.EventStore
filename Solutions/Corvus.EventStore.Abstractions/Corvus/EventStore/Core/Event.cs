@@ -18,13 +18,21 @@ namespace Corvus.EventStore.Core
         /// <param name="aggregateId">The Id of the aggregate to which this event is applied.</param>
         /// <param name="eventType">The <see cref="EventType"/>.</param>
         /// <param name="sequenceNumber">The <see cref="SequenceNumber"/>.</param>
+        /// <param name="timestamp">The <see cref="Timestamp"/>.</param>
         /// <param name="partitionKey">The <see cref="PartitionKey"/>.</param>
         /// <param name="payload">The <see cref="Payload"/>.</param>
-        public Event(string aggregateId, string eventType, long sequenceNumber, string partitionKey, TPayload payload)
+        public Event(
+            string aggregateId,
+            string eventType,
+            long sequenceNumber,
+            long timestamp,
+            string partitionKey,
+            TPayload payload)
         {
             this.AggregateId = aggregateId;
             this.EventType = eventType;
             this.SequenceNumber = sequenceNumber;
+            this.Timestamp = timestamp;
             this.PartitionKey = partitionKey;
             this.Payload = payload;
         }
@@ -40,6 +48,9 @@ namespace Corvus.EventStore.Core
 
         /// <inheritdoc/>
         public string EventType { get; }
+
+        /// <inheritdoc/>
+        public long Timestamp { get; }
 
         /// <summary>
         /// Gets the payload data for the event.

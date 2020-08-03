@@ -14,34 +14,27 @@ namespace Corvus.EventStore.Snapshots
         /// Initializes a new instance of the <see cref="Snapshot{TMemento}"/> struct.
         /// </summary>
         /// <param name="aggregateId">The Id of the aggregate that created the snapshot.</param>
-        /// <param name="sequenceId">The <see cref="SequenceId"/>.</param>
+        /// <param name="sequenceNumber">The <see cref="SequenceNumber"/>.</param>
         /// <param name="payload">The <see cref="Payload"/>.</param>
-        public Snapshot(string aggregateId, long sequenceId, TMemento payload)
+        public Snapshot(string aggregateId, long sequenceNumber, TMemento payload)
         {
-            this.SequenceId = sequenceId;
+            this.SequenceNumber = sequenceNumber;
             this.Payload = payload;
             this.AggregateId = aggregateId;
         }
 
-        /// <summary>
-        /// Gets the Id of the aggregate from which this snapshot was generated.
-        /// </summary>
+        /// <inheritdoc/>
         public string AggregateId { get; }
 
-        /// <summary>
-        /// Gets the sequence number for the snapshot.
-        /// </summary>
-        public long SequenceId { get; }
+        /// <inheritdoc/>
+        public long SequenceNumber { get; }
 
         /// <summary>
         /// Gets the memoized version of the aggregate for the snapshot.
         /// </summary>
         public TMemento Payload { get; }
 
-        /// <summary>
-        /// Gets the memoized version of the aggregate for the snapshot.
-        /// </summary>
-        /// <returns>The memento.</returns>
+        /// <inheritdoc/>
         public TMemento GetPayload() => this.Payload;
     }
 }
