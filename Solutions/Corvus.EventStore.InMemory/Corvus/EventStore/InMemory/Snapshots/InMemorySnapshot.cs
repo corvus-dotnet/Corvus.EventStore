@@ -39,14 +39,17 @@ namespace Corvus.EventStore.InMemory.Snapshots
         /// <summary>
         /// Creates a new InMemoryEvent from a source ISnapshot.
         /// </summary>
+        /// <typeparam name="TSnapshot">The type of the snapshot.</typeparam>
+        /// <typeparam name="TMemento">The type of the memento.</typeparam>
         /// <param name="event">The source snapshot.</param>
         /// <returns>A new InMemorySnapshot.</returns>
-        public static InMemorySnapshot CreateFrom(ISnapshot @event)
+        public static InMemorySnapshot CreateFrom<TSnapshot, TMemento>(TSnapshot @event)
+            where TSnapshot : ISnapshot
         {
             return new InMemorySnapshot(
                 @event.AggregateId,
                 @event.SequenceNumber,
-                JsonExtensions.FromObject(@event.GetPayload<object>()));
+                JsonExtensions.FromObject(@event.GetPayload<TMemento>()));
         }
 
         /// <inheritdoc/>

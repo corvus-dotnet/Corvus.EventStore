@@ -4,6 +4,7 @@
 
 namespace Corvus.EventStore.Core
 {
+    using System;
     using System.Collections.Generic;
     using System.Threading.Tasks;
 
@@ -13,21 +14,20 @@ namespace Corvus.EventStore.Core
     public interface IEventWriter
     {
         /// <summary>
-        /// Writes the supplied events to the store as a single transaction.
-        /// </summary>
-        /// <typeparam name="TEvent">The type of event being written.</typeparam>
-        /// <param name="events">The events to write.</param>
-        /// <returns>A task that completes when the events have been written to the store.</returns>
-        ValueTask WriteAsync<TEvent>(in IEnumerable<TEvent> events)
-            where TEvent : IEvent;
-
-        /// <summary>
         /// Writes the supplied event to the store as a single transaction.
         /// </summary>
         /// <typeparam name="TEvent">The type of event being written.</typeparam>
+        /// <typeparam name="TPayload">The type of the payload being written.</typeparam>
         /// <param name="event">The event to write.</param>
         /// <returns>A task that completes when the events have been written to the store.</returns>
-        ValueTask WriteAsync<TEvent>(in TEvent @event)
+        ValueTask WriteAsync<TEvent, TPayload>(in TEvent @event)
             where TEvent : IEvent;
+
+        /// <summary>
+        /// Performs the supplied list of writes to the store as a single transaction.
+        /// </summary>
+        /// <param name="eventWrites">The set of writes to add to the batch.</param>
+        /// <returns>A task that completes when the events have been written to the store.</returns>
+        ValueTask WriteBatchAsync(in IEnumerable<Action<IEventBatchWriter>> eventWrites);
     }
 }

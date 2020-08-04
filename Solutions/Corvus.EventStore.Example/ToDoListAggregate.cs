@@ -72,7 +72,45 @@
             return this.ApplyEvent(newEvent);
         }
 
-        public ToDoListAggregate ApplyEvent<TEvent>(TEvent @event) where TEvent : IEvent
+        public ToDoListAggregate ApplyEvents(IEventEnumerator events)
+        {
+            ToDoListAggregate currentAggregate = this;
+
+            while (events.MoveNext())
+            {
+                switch (events.CurrentEventType)
+                {
+                    case ToDoItemAddedEventPayload.EventType:
+                        currentAggregate = this.WithToDoItemAddedEvent(
+                            new Event<ToDoItemAddedEventPayload>(
+                                events.CurrentAggregateId,
+                                events.CurrentEventType,
+                                events.CurrentSequenceNumber,
+                                events.CurrentTimestamp,
+                                events.CurrentPartitionKey,
+                                events.GetCurrentPayload<ToDoItemAddedEventPayload>()));
+                        break;
+
+                    case ToDoItemRemovedEventPayload.EventType:
+                        currentAggregate = this.WithToDoItemAddedEvent(
+                            new Event<ToDoItemRemovedEventPayload>(
+                                events.CurrentAggregateId,
+                                events.CurrentEventType,
+                                events.CurrentSequenceNumber,
+                                events.CurrentTimestamp,
+                                events.CurrentPartitionKey,
+                                events.GetCurrentPayload<ToDoItemRemovedEventPayload>()));
+                        break;
+
+                    default:
+                        throw new ArgumentException($"Unrecognised event type '{events.CurrentEventType}'.");
+                }
+            }
+
+            return currentAggregate;
+        }
+
+        public ToDoListAggregate ApplyEvent<TEvent>(in TEvent @event) where TEvent : IEvent
         {
             if (@event.AggregateId != this.AggregateId)
             {
@@ -117,7 +155,8 @@
             public ImmutableList<ToDoItem> Tasks { get; }
         }
 
-        private ToDoListAggregate WithToDoItemAddedEvent(IEvent @event)
+        private ToDoListAggregate WithToDoItemAddedEvent<TEvent>(TEvent @event)
+            where TEvent : IEvent
         {
             ToDoItemAddedEventPayload payload = @event.GetPayload<ToDoItemAddedEventPayload>();
 
@@ -128,7 +167,8 @@
                 this.uncommittedEvents.Add(@event));
         }
 
-        private ToDoListAggregate WithToDoItemRemovedEvent(IEvent @event)
+        private ToDoListAggregate WithToDoItemRemovedEvent<TEvent>(TEvent @event)
+            where TEvent : IEvent
         {
             ToDoItemRemovedEventPayload payload = @event.GetPayload<ToDoItemRemovedEventPayload>();
 

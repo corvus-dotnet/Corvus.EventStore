@@ -7,6 +7,7 @@ namespace Corvus.EventStore.Aggregates
     using System;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
+    using Corvus.EventStore.Snapshots;
 
     /// <summary>
     /// Reads aggregate roots using a combination of snapshot and events.
@@ -17,8 +18,8 @@ namespace Corvus.EventStore.Aggregates
     /// <typeparam name="TMemento">The memento type used by the aggregate that can be read by this reader.</typeparam>
     public readonly struct AggregateReader<TEventReader, TSnapshotReader, TSnapshot, TMemento>
         where TEventReader : IEventReader
-        where TSnapshotReader : ISnapshotReader<TSnapshot, TMemento>
-        where TSnapshot : ISnapshot<TMemento>
+        where TSnapshotReader : ISnapshotReader
+        where TSnapshot : ISnapshot
     {
         private readonly TEventReader eventReader;
         private readonly TSnapshotReader snapshotReader;
@@ -54,7 +55,7 @@ namespace Corvus.EventStore.Aggregates
             long sequenceNumber = long.MaxValue)
             where TAggregate : IAggregateRoot<TAggregate>
         {
-            TSnapshot snapshot = await this.snapshotReader.ReadAsync(defaultPayloadFactory, aggregateId, sequenceNumber).ConfigureAwait(false);
+            TSnapshot snapshot = await this.snapshotReader.ReadAsync<TSnapshot, TMemento>(defaultPayloadFactory, aggregateId, sequenceNumber).ConfigureAwait(false);
             TAggregate aggregate = aggregateFactory(snapshot);
 
             if (aggregate.SequenceNumber < sequenceNumber)
@@ -67,10 +68,7 @@ namespace Corvus.EventStore.Aggregates
 
                 while (true)
                 {
-                    foreach (IEvent @event in newEvents.Events)
-                    {
-                        aggregate = aggregate.ApplyEvent(@event);
-                    }
+                    aggregate = aggregate.ApplyEvents(newEvents.Events);
 
                     if (string.IsNullOrEmpty(newEvents.ContinuationToken))
                     {

@@ -4,8 +4,6 @@
 
 namespace Corvus.EventStore.Core
 {
-    using System.Collections.Generic;
-
     /// <summary>
     /// A result set from a call to <see cref="IEventReader.ReadAsync(string, long, long, int)"/>.
     /// </summary>
@@ -19,6 +17,6 @@ namespace Corvus.EventStore.Core
         /// <summary>
         /// Gets the list of returned events.
         /// </summary>
-        public IEnumerable<IEvent> Events { get; }
+        public IEventEnumerator Events { get; }
     }
 }

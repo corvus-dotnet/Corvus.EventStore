@@ -4,6 +4,7 @@
 
 namespace Corvus.EventStore.InMemory.Core
 {
+    using System;
     using System.Collections.Generic;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
@@ -26,17 +27,16 @@ namespace Corvus.EventStore.InMemory.Core
         }
 
         /// <inheritdoc/>
-        public ValueTask WriteAsync<TEvent>(in IEnumerable<TEvent> events)
+        public ValueTask WriteAsync<TEvent, TPayload>(in TEvent @event)
             where TEvent : IEvent
         {
-            return this.store.WriteAsync(events);
+            return this.store.WriteAsync(InMemoryEvent.CreateFrom<TEvent, TPayload>(@event));
         }
 
         /// <inheritdoc/>
-        public ValueTask WriteAsync<TEvent>(in TEvent @event)
-            where TEvent : IEvent
+        public ValueTask WriteBatchAsync(in IEnumerable<Action<IEventBatchWriter>> eventWrites)
         {
-            return this.store.WriteAsync(@event);
+            return this.store.WriteBatchAsync(eventWrites);
         }
     }
 }

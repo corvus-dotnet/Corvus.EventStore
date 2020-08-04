@@ -5,7 +5,7 @@
         static void Main(string[] args)
         {
             // New up all the things (concrete readers, writers, etc). 
-            var todoListReader = new ToDoListReader()
+            var todoListReader = new ToDoListReader();
             
 
             // Example 1: Retrieve a new instance of an aggregate from the store. Do things to it and save it.

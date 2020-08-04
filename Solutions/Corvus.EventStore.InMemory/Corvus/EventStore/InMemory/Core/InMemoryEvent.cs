@@ -15,7 +15,7 @@ namespace Corvus.EventStore.InMemory.Core
         private readonly byte[] source;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="Event{TPayload}"/> struct.
+        /// Initializes a new instance of the <see cref="InMemoryEvent"/> struct.
         /// </summary>
         /// <param name="aggregateId">The Id of the aggregate to which this event is applied.</param>
         /// <param name="eventType">The <see cref="EventType"/>.</param>
@@ -57,9 +57,12 @@ namespace Corvus.EventStore.InMemory.Core
         /// <summary>
         /// Creates a new InMemoryEvent from a source Event{TPayload}.
         /// </summary>
+        /// <typeparam name="TEvent">the type of the event.</typeparam>
+        /// <typeparam name="TPayload">the type of the payload.</typeparam>
         /// <param name="event">The source event.</param>
         /// <returns>A new InMemoryEvent.</returns>
-        public static InMemoryEvent CreateFrom(IEvent @event)
+        public static InMemoryEvent CreateFrom<TEvent, TPayload>(TEvent @event)
+            where TEvent : IEvent
         {
             return new InMemoryEvent(
                 @event.AggregateId,
@@ -67,7 +70,7 @@ namespace Corvus.EventStore.InMemory.Core
                 @event.SequenceNumber,
                 @event.Timestamp,
                 @event.PartitionKey,
-                JsonExtensions.FromObject(@event.GetPayload<object>()));
+                JsonExtensions.FromObject(@event.GetPayload<TPayload>()));
         }
 
         /// <inheritdoc/>

@@ -54,10 +54,11 @@ namespace Corvus.EventStore.InMemory.Snapshots.Internal
         /// <param name="snapshot">The snapshot to store.</param>
         /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
         /// <typeparam name="TSnapshot">The type of the snapshot being written.</typeparam>
-        public ValueTask WriteAsync<TSnapshot>(in TSnapshot snapshot)
+        /// <typeparam name="TMemento">The type of the memento being written.</typeparam>
+        public ValueTask WriteAsync<TSnapshot, TMemento>(in TSnapshot snapshot)
             where TSnapshot : ISnapshot
         {
-            var inMemorySnapshot = InMemorySnapshot.CreateFrom(snapshot);
+            var inMemorySnapshot = InMemorySnapshot.CreateFrom<TSnapshot, TMemento>(snapshot);
 
             this.store.AddOrUpdate(
                 snapshot.AggregateId,

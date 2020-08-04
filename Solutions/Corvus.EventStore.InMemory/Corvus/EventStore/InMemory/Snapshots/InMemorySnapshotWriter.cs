@@ -25,10 +25,10 @@ namespace Corvus.EventStore.InMemory.Snapshots
         }
 
         /// <inheritdoc/>
-        public ValueTask WriteAsync<TSnapshot>(in TSnapshot snapshot)
+        public ValueTask WriteAsync<TSnapshot, TMemento>(in TSnapshot snapshot)
             where TSnapshot : ISnapshot
         {
-            return this.store.WriteAsync(snapshot);
+            return this.store.WriteAsync<TSnapshot, TMemento>(snapshot);
         }
     }
 }

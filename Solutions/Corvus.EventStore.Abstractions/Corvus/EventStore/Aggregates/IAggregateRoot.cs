@@ -31,13 +31,21 @@ namespace Corvus.EventStore.Aggregates
         /// <typeparam name="TEvent">The type of event to apply.</typeparam>
         /// <param name="event">The event to apply.</param>
         /// <remarks>
-        /// This will be called in two scenarios:
-        /// - A new event has been created.
-        /// - The aggregate is being rehydrated from stored events.
+        /// This will be called when a new event has been created.
         /// </remarks>
         /// <returns>The aggregate with the event applied.</returns>
-        TAggregate ApplyEvent<TEvent>(TEvent @event)
+        TAggregate ApplyEvent<TEvent>(in TEvent @event)
             where TEvent : IEvent;
+
+        /// <summary>
+        /// Applies the given events to the aggregate.
+        /// </summary>
+        /// <param name="events">The ordered list of events to apply to the aggregate.</param>
+        /// <returns>The aggreagte with the events applied.</returns>
+        /// <remarks>
+        /// This will typically be called when the aggregate is being rehydrated from stored events.
+        /// </remarks>
+        TAggregate ApplyEvents(IEventEnumerator events);
 
         /// <summary>
         /// Stores uncommitted events using the specified event writer.

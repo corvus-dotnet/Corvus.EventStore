@@ -26,9 +26,11 @@ namespace Corvus.EventStore.InMemory.Snapshots
         }
 
         /// <inheritdoc/>
-        public async ValueTask<ISnapshot> ReadAsync<TMemento>(Func<TMemento> defaultPayloadFactory, string aggregateId, long atSequenceId = long.MaxValue)
+        public async ValueTask<TSnapshot> ReadAsync<TSnapshot, TMemento>(Func<TMemento> defaultPayloadFactory, string aggregateId, long atSequenceId = long.MaxValue)
+            where TSnapshot : ISnapshot
         {
-            return await this.store.ReadAsync(defaultPayloadFactory, aggregateId, atSequenceId).ConfigureAwait(false);
+            InMemorySnapshot inMemorySnapshot = await this.store.ReadAsync<TMemento>(defaultPayloadFactory, aggregateId, atSequenceId).ConfigureAwait(false);
+            return inMemorySnapshot is TSnapshot snapshot ? snapshot : throw new InvalidOperationException($"The requested snapshot type {typeof(TSnapshot)} is not compatible with {inMemorySnapshot.GetType()}");
         }
     }
 }

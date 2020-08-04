@@ -34,14 +34,13 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         {
             if (!this.store.TryGetValue(aggregateId, out InMemoryEventList list))
             {
-                return new ValueTask<IEventReaderResult>(new InMemoryEventReaderResult(Enumerable.Empty<IEvent>(), null));
+                return new ValueTask<IEventReaderResult>(new InMemoryEventReaderResult(Enumerable.Empty<InMemoryEvent>(), null));
             }
 
-            IEvent[] events = list.Events
+            InMemoryEvent[] events = list.Events
                 .Where(item => item.Key >= fromSequenceNumber && item.Key <= toSequenceNumber)
                 .Take(maxItems)
                 .Select(item => item.Value)
-                .Cast<IEvent>()
                 .ToArray();
 
             string? encodedContinuationToken = null;
@@ -72,25 +71,25 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         /// <summary>
         /// Writes the supplied events to the store as a single transaction.
         /// </summary>
-        /// <typeparam name="TEvent">The type of event being written.</typeparam>
-        /// <param name="events">The events to write.</param>
+        /// <param name="eventWrites">The write instructions.</param>
         /// <returns>A task that completes when the events have been written to the store.</returns>
-        public ValueTask WriteAsync<TEvent>(in IEnumerable<TEvent> events)
-            where TEvent : IEvent
+        public ValueTask WriteBatchAsync(IEnumerable<Action<IEventBatchWriter>> eventWrites)
         {
-            if (events is null)
+            InMemoryStoreEventBatchWriter batch = default;
+
+            foreach (Action<IEventBatchWriter> writer in eventWrites)
             {
-                throw new ArgumentNullException(nameof(events));
+                writer(batch);
             }
 
-            InMemoryEvent[] eventsArray = events.Select(ev => InMemoryEvent.CreateFrom(ev)).ToArray();
+            ImmutableArray<InMemoryEvent> events = batch.Events;
 
-            if (eventsArray.Length == 0)
+            if (events.Length == 0)
             {
                 return new ValueTask(Task.CompletedTask);
             }
 
-            string aggregateId = eventsArray[0].AggregateId;
+            string aggregateId = events[0].AggregateId;
 
             events.ForEachAtIndex((ev, idx) =>
             {
@@ -99,7 +98,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                     throw new ArgumentException("All supplied events must have the same aggregate Id.", nameof(events));
                 }
 
-                if (idx > 0 && ev.SequenceNumber != eventsArray[idx - 1].SequenceNumber + 1)
+                if (idx > 0 && ev.SequenceNumber != events[idx - 1].SequenceNumber + 1)
                 {
                     throw new ArgumentException("Event sequence numbers must be consecutive.", nameof(events));
                 }
@@ -109,26 +108,26 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                 aggregateId,
                 seq =>
                 {
-                    if (eventsArray[0].SequenceNumber != 0)
+                    if (events[0].SequenceNumber != 0)
                     {
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return new InMemoryEventList(0, ImmutableDictionary<long, InMemoryEvent>.Empty.AddRange(eventsArray.Select(ev => KeyValuePair.Create(ev.SequenceNumber, ev))));
+                    return new InMemoryEventList(0, ImmutableDictionary<long, InMemoryEvent>.Empty.AddRange(events.Select(ev => KeyValuePair.Create(ev.SequenceNumber, ev))));
                 },
                 (aggregateId, list) =>
                 {
-                    if (list.LastSequenceNumber >= eventsArray[0].SequenceNumber)
+                    if (list.LastSequenceNumber >= events[0].SequenceNumber)
                     {
                         throw new InMemoryEventStoreConcurrencyException();
                     }
 
-                    if (list.LastSequenceNumber != eventsArray[0].SequenceNumber - 1)
+                    if (list.LastSequenceNumber != events[0].SequenceNumber - 1)
                     {
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return list.AddEvents(eventsArray);
+                    return list.AddEvents(events);
                 });
 
             return new ValueTask(Task.CompletedTask);
@@ -137,38 +136,34 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         /// <summary>
         /// Writes the supplied event to the store as a single transaction.
         /// </summary>
-        /// <typeparam name="TEvent">The type of event being written.</typeparam>
         /// <param name="event">The event to write.</param>
         /// <returns>A task that completes when the events have been written to the store.</returns>
-        public ValueTask WriteAsync<TEvent>(in TEvent @event)
-            where TEvent : IEvent
+        public ValueTask WriteAsync(InMemoryEvent @event)
         {
-            var inMemoryEvent = InMemoryEvent.CreateFrom(@event);
-
             this.store.AddOrUpdate(
                 @event.AggregateId,
                 seq =>
                 {
-                    if (inMemoryEvent.SequenceNumber != 0)
+                    if (@event.SequenceNumber != 0)
                     {
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return new InMemoryEventList(0, ImmutableDictionary<long, InMemoryEvent>.Empty.Add(0, inMemoryEvent));
+                    return new InMemoryEventList(0, ImmutableDictionary<long, InMemoryEvent>.Empty.Add(0, @event));
                 },
                 (aggregateId, list) =>
                 {
-                    if (list.LastSequenceNumber >= inMemoryEvent.SequenceNumber)
+                    if (list.LastSequenceNumber >= @event.SequenceNumber)
                     {
                         throw new InMemoryEventStoreConcurrencyException();
                     }
 
-                    if (list.LastSequenceNumber != inMemoryEvent.SequenceNumber - 1)
+                    if (list.LastSequenceNumber != @event.SequenceNumber - 1)
                     {
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return list.AddEvents(new[] { inMemoryEvent });
+                    return list.AddEvents(ImmutableArray<InMemoryEvent>.Empty.Add(@event));
                 });
 
             return new ValueTask(Task.CompletedTask);
@@ -205,11 +200,29 @@ namespace Corvus.EventStore.InMemory.Core.Internal
 
             public ImmutableDictionary<long, InMemoryEvent> Events { get; }
 
-            public InMemoryEventList AddEvents(InMemoryEvent[] events)
+            public InMemoryEventList AddEvents(ImmutableArray<InMemoryEvent> events)
             {
                 return new InMemoryEventList(
                     this.LastSequenceNumber + 1,
                     this.Events.AddRange(events.Select(ev => KeyValuePair.Create(ev.SequenceNumber, ev))));
+            }
+        }
+
+        private struct InMemoryStoreEventBatchWriter : IEventBatchWriter
+        {
+            private List<InMemoryEvent>? events;
+
+            public ImmutableArray<InMemoryEvent> Events => ImmutableArray<InMemoryEvent>.Empty.AddRange(this.events);
+
+            public void WriteBatchItemAsync<TEvent, TPayload>(in TEvent @event)
+                where TEvent : IEvent
+            {
+                if (this.events is null)
+                {
+                    this.events = new List<InMemoryEvent>();
+                }
+
+                this.events.Add(InMemoryEvent.CreateFrom<TEvent, TPayload>(@event));
             }
         }
     }
