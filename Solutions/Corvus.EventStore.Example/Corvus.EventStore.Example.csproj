@@ -5,4 +5,8 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Corvus.EventStore.Abstractions\Corvus.EventStore.Abstractions.csproj" />
+  </ItemGroup>
+
 </Project>

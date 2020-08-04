@@ -45,14 +45,14 @@ namespace Corvus.EventStore.Aggregates
             TAggregate aggregate,
             long timestamp,
             TSnapshotPolicy snapshotPolicy = default)
-            where TAggregate : IAggregateRoot
+            where TAggregate : IAggregateRoot<TAggregate>
             where TSnapshotPolicy : struct, IAggregateWriterSnapshotPolicy<TAggregate>
         {
-            aggregate = await aggregate.StoreAsync<TEventWriter, TAggregate>(this.eventWriter).ConfigureAwait(false);
+            aggregate = await aggregate.StoreAsync(this.eventWriter).ConfigureAwait(false);
 
             if (snapshotPolicy.ShouldSnapshot(aggregate, timestamp))
             {
-                aggregate = await aggregate.StoreSnapshotAsync<TSnapshotWriter, TAggregate>(this.snapshotWriter).ConfigureAwait(false);
+                aggregate = await aggregate.StoreSnapshotAsync(this.snapshotWriter).ConfigureAwait(false);
             }
 
             return aggregate;

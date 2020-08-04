@@ -23,10 +23,10 @@ namespace Corvus.EventStore.Core
             string aggregateId,
             long fromSequenceNumber,
             long toSequenceNumber,
-            long maxItems);
+            int maxItems);
 
         /// <summary>
-        /// Reads the next block in a result set initially acquired by calling <see cref="ReadAsync(string, long, long, long)"/>.
+        /// Reads the next block in a result set initially acquired by calling <see cref="ReadAsync(string, long, long, int)"/>.
         /// </summary>
         /// <param name="continuationToken">A continuation token returned from a previous call that can be used to
         /// obtain the next set of results.</param>

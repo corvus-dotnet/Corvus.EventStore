@@ -7,7 +7,7 @@ namespace Corvus.EventStore.Core
     using System.Collections.Generic;
 
     /// <summary>
-    /// A result set from a call to <see cref="IEventReader.ReadAsync(string, long, long, long)"/>.
+    /// A result set from a call to <see cref="IEventReader.ReadAsync(string, long, long, int)"/>.
     /// </summary>
     public interface IEventReaderResult
     {

@@ -5,12 +5,12 @@
 namespace Corvus.EventStore.Aggregates
 {
     /// <summary>
-    /// Defines the policy for creating new snapshots when events for an <see cref="IAggregateRoot"/> are written to
+    /// Defines the policy for creating new snapshots when events for an <see cref="IAggregateRoot{TAggregate}"/> are written to
     /// the event store.
     /// </summary>
     /// <typeparam name="TAggregate">The type of aggregate to which this snapshot policy applies.</typeparam>
     public interface IAggregateWriterSnapshotPolicy<TAggregate>
-        where TAggregate : IAggregateRoot
+        where TAggregate : IAggregateRoot<TAggregate>
     {
         /// <summary>
         /// Determines whether a new snapshot should be created for the given aggregate and timestamp.

@@ -14,15 +14,18 @@ namespace Corvus.EventStore.Aggregates
     /// </summary>
     /// <typeparam name="TEventReader">The type of the underlying event reader.</typeparam>
     /// <typeparam name="TSnapshotReader">The type of the underlying snapshot reader.</typeparam>
-    public readonly struct AggregateReader<TEventReader, TSnapshotReader>
+    /// <typeparam name="TSnapshot">The underlying snapshot type created by the snapshot reader implementation.</typeparam>
+    /// <typeparam name="TMemento">The memento type used by the aggregate that can be read by this reader.</typeparam>
+    public readonly struct AggregateReader<TEventReader, TSnapshotReader, TSnapshot, TMemento>
         where TEventReader : IEventReader
-        where TSnapshotReader : ISnapshotReader
+        where TSnapshotReader : ISnapshotReader<TSnapshot, TMemento>
+        where TSnapshot : ISnapshot<TMemento>
     {
         private readonly TEventReader eventReader;
         private readonly TSnapshotReader snapshotReader;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AggregateReader{TEventReader, TSnapshotReader}"/> struct.
+        /// Initializes a new instance of the <see cref="AggregateReader{TEventReader, TSnapshotReader, TSnapshot, TMemento}"/> struct.
         /// </summary>
         /// <param name="eventReader">The underlying event reader.</param>
         /// <param name="snapshotReader">The underlying snapshot reader.</param>
@@ -36,7 +39,6 @@ namespace Corvus.EventStore.Aggregates
         /// Reads the aggregate with the specified Id.
         /// </summary>
         /// <typeparam name="TAggregate">The type of aggregate being read.</typeparam>
-        /// <typeparam name="TMemento">The type of memento used by the aggregate for snapshots.</typeparam>
         /// <param name="aggregateFactory">A factory method for creating an aggregate from the supplied memento.</param>
         /// <param name="defaultPayloadFactory">A factory method for creating a default snapshot payload if one cannot be found.</param>
         /// <param name="aggregateId">The Id of the aggregate.</param>
@@ -46,15 +48,15 @@ namespace Corvus.EventStore.Aggregates
         /// If a sequence number is supplied, the aggregate will be recreated using events with sequence numbers lower
         /// than or equal to the specified value.
         /// </remarks>
-        public async ValueTask<TAggregate> ReadAsync<TAggregate, TMemento>(
-            Func<TMemento, TAggregate> aggregateFactory,
+        public async ValueTask<TAggregate> ReadAsync<TAggregate>(
+            Func<TSnapshot, TAggregate> aggregateFactory,
             Func<TMemento> defaultPayloadFactory,
             string aggregateId,
             long sequenceNumber = long.MaxValue)
-            where TAggregate : IAggregateRoot
+            where TAggregate : IAggregateRoot<TAggregate>
         {
-            Snapshot<TMemento> snapshot = await this.snapshotReader.ReadAsync(defaultPayloadFactory, aggregateId, sequenceNumber).ConfigureAwait(false);
-            TAggregate aggregate = aggregateFactory(snapshot.Payload);
+            TSnapshot snapshot = await this.snapshotReader.ReadAsync(defaultPayloadFactory, aggregateId, sequenceNumber).ConfigureAwait(false);
+            TAggregate aggregate = aggregateFactory(snapshot);
 
             if (aggregate.SequenceNumber < sequenceNumber)
             {
@@ -68,7 +70,7 @@ namespace Corvus.EventStore.Aggregates
                 {
                     foreach (IEvent @event in newEvents.Events)
                     {
-                        aggregate = aggregate.ApplyEvent<IEvent, TAggregate>(@event);
+                        aggregate = aggregate.ApplyEvent(@event);
                     }
 
                     if (string.IsNullOrEmpty(newEvents.ContinuationToken))
