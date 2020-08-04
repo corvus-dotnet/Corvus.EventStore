@@ -7,7 +7,6 @@ namespace Corvus.EventStore.Aggregates
     using System;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
-    using Corvus.EventStore.Snapshots;
 
     /// <summary>
     /// Reads aggregate roots using a combination of snapshot and events.

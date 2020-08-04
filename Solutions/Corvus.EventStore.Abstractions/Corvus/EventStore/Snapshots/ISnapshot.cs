@@ -7,8 +7,7 @@ namespace Corvus.EventStore.Snapshots
     /// <summary>
     /// Represents a snapshot of an aggregate at a point in its history.
     /// </summary>
-    /// <typeparam name="TMemento">The type of the memento produced by the source aggregate.</typeparam>
-    public interface ISnapshot<TMemento>
+    public interface ISnapshot
     {
         /// <summary>
         /// Gets the Id of the aggregate from which this snapshot was generated.
@@ -23,7 +22,8 @@ namespace Corvus.EventStore.Snapshots
         /// <summary>
         /// Gets the memoized version of the aggregate for the snapshot.
         /// </summary>
+        /// <typeparam name="TMemento">The type of the memento produced by the source aggregate.</typeparam>
         /// <returns>The payload.</returns>
-        TMemento GetPayload();
+        TMemento GetPayload<TMemento>();
     }
 }

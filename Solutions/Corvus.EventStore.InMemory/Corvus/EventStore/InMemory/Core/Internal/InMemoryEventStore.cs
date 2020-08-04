@@ -128,7 +128,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return new InMemoryEventList(eventsArray[^0].SequenceNumber, list.Events.AddRange(eventsArray.Select(ev => KeyValuePair.Create(ev.SequenceNumber, ev))));
+                    return list.AddEvents(eventsArray);
                 });
 
             return new ValueTask(Task.CompletedTask);
@@ -168,7 +168,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return new InMemoryEventList(inMemoryEvent.SequenceNumber, list.Events.Add(inMemoryEvent.SequenceNumber, inMemoryEvent));
+                    return list.AddEvents(new[] { inMemoryEvent });
                 });
 
             return new ValueTask(Task.CompletedTask);

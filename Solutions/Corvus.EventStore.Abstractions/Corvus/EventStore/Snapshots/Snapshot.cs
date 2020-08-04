@@ -4,11 +4,13 @@
 
 namespace Corvus.EventStore.Snapshots
 {
+    using System;
+
     /// <summary>
     /// Represents a snapshot of an aggregate at a point in its history.
     /// </summary>
     /// <typeparam name="TMemento">The type of the memento produced by the source aggregate.</typeparam>
-    public readonly struct Snapshot<TMemento> : ISnapshot<TMemento>
+    public readonly struct Snapshot<TMemento> : ISnapshot
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="Snapshot{TMemento}"/> struct.
@@ -35,6 +37,6 @@ namespace Corvus.EventStore.Snapshots
         public TMemento Payload { get; }
 
         /// <inheritdoc/>
-        public TMemento GetPayload() => this.Payload;
+        public TTargetType GetPayload<TTargetType>() => this.Payload is TTargetType target ? target : throw new InvalidOperationException();
     }
 }

@@ -3,7 +3,6 @@
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
     using Corvus.EventStore.Core;
-    using Corvus.EventStore.Snapshots;
 
     public readonly struct ToDoListReader<TEventReader, TSnapshotReader, TSnapshot>
         where TEventReader : IEventReader
