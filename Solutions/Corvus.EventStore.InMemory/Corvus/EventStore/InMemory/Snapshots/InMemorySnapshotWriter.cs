@@ -2,11 +2,11 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.InMemory.Snapshots
+namespace Corvus2.EventStore.InMemory.Snapshots
 {
     using System.Threading.Tasks;
-    using Corvus.EventStore.InMemory.Snapshots.Internal;
-    using Corvus.EventStore.Snapshots;
+    using Corvus2.EventStore.InMemory.Snapshots.Internal;
+    using Corvus2.EventStore.Snapshots;
 
     /// <summary>
     /// In-memory implementation of <see cref="ISnapshotWriter"/>.
@@ -25,10 +25,9 @@ namespace Corvus.EventStore.InMemory.Snapshots
         }
 
         /// <inheritdoc/>
-        public ValueTask WriteAsync<TSnapshot, TMemento>(in TSnapshot snapshot)
-            where TSnapshot : ISnapshot
+        public Task WriteAsync(in SerializedSnapshot snapshot)
         {
-            return this.store.WriteAsync<TSnapshot, TMemento>(snapshot);
+            return this.store.WriteAsync(snapshot);
         }
     }
 }

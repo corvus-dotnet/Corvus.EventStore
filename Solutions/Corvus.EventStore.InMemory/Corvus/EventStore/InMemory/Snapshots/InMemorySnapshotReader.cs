@@ -2,12 +2,11 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.InMemory.Snapshots
+namespace Corvus2.EventStore.InMemory.Snapshots
 {
-    using System;
     using System.Threading.Tasks;
-    using Corvus.EventStore.InMemory.Snapshots.Internal;
-    using Corvus.EventStore.Snapshots;
+    using Corvus2.EventStore.InMemory.Snapshots.Internal;
+    using Corvus2.EventStore.Snapshots;
 
     /// <summary>
     /// In-memory implementation of <see cref="ISnapshotReader"/>.
@@ -26,11 +25,9 @@ namespace Corvus.EventStore.InMemory.Snapshots
         }
 
         /// <inheritdoc/>
-        public async ValueTask<TSnapshot> ReadAsync<TSnapshot, TMemento>(Func<TMemento> defaultPayloadFactory, string aggregateId, long atSequenceId = long.MaxValue)
-            where TSnapshot : ISnapshot
+        public ValueTask<SerializedSnapshot> ReadAsync(string aggregateId, long atSequenceId = long.MaxValue)
         {
-            InMemorySnapshot inMemorySnapshot = await this.store.ReadAsync<TMemento>(defaultPayloadFactory, aggregateId, atSequenceId).ConfigureAwait(false);
-            return inMemorySnapshot is TSnapshot snapshot ? snapshot : throw new InvalidOperationException($"The requested snapshot type {typeof(TSnapshot)} is not compatible with {inMemorySnapshot.GetType()}");
+            return this.store.ReadAsync(aggregateId, atSequenceId);
         }
     }
 }

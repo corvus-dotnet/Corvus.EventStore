@@ -2,50 +2,46 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.InMemory.Snapshots.Internal
+namespace Corvus2.EventStore.InMemory.Snapshots.Internal
 {
-    using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Collections.Immutable;
     using System.Linq;
     using System.Threading.Tasks;
-    using Corvus.EventStore.Snapshots;
+    using Corvus2.EventStore.Snapshots;
 
     /// <summary>
     /// Underlying store used by <see cref="InMemorySnapshotReader"/> and <see cref="InMemorySnapshotWriter"/>.
     /// </summary>
     public class InMemorySnapshotStore
     {
-        private readonly ConcurrentDictionary<string, InMemorySnapshotList> store =
-            new ConcurrentDictionary<string, InMemorySnapshotList>();
+        private readonly ConcurrentDictionary<string, SnapshotList> store =
+            new ConcurrentDictionary<string, SnapshotList>();
 
         /// <summary>
         /// Reads the specified snapshot for the given aggregate.
         /// </summary>
-        /// <typeparam name="TMemento">The type of memento that the target snapshot contains.</typeparam>
-        /// <param name="defaultPayloadFactory">A factory method that can be used to create an empty snapshot if none have been stored.</param>
         /// <param name="aggregateId">The Id of the aggregate to read the snapshot for.</param>
         /// <param name="atSequenceId">The sequence Id to read the snapshot at. The snapshot returned will be the one with the highest sequence number less than or equal to this value.</param>
         /// <returns>The most recent snapshot for the aggregate. If no snapshot exists, a new snapshot will be returned containing a payload created via the defaultPayloadFactory.</returns>
-        public ValueTask<InMemorySnapshot> ReadAsync<TMemento>(
-            Func<TMemento> defaultPayloadFactory,
+        public ValueTask<SerializedSnapshot> ReadAsync(
             string aggregateId,
             long atSequenceId = long.MaxValue)
         {
-            if (!this.store.TryGetValue(aggregateId, out InMemorySnapshotList list))
+            if (!this.store.TryGetValue(aggregateId, out SnapshotList list))
             {
-                return new ValueTask<InMemorySnapshot>(new InMemorySnapshot(aggregateId, -1, JsonExtensions.FromObject(defaultPayloadFactory())));
+                return new ValueTask<SerializedSnapshot>(SerializedSnapshot.Empty);
             }
 
-            KeyValuePair<long, InMemorySnapshot>? snapshot = list.Snapshots.OrderByDescending(s => s.Key).Where(s => s.Key < atSequenceId).FirstOrDefault();
+            KeyValuePair<long, SerializedSnapshot>? snapshot = list.Snapshots.OrderByDescending(s => s.Key).Where(s => s.Key < atSequenceId).FirstOrDefault();
 
             if (snapshot is null)
             {
-                return new ValueTask<InMemorySnapshot>(new InMemorySnapshot(aggregateId, -1, JsonExtensions.FromObject(defaultPayloadFactory())));
+                return new ValueTask<SerializedSnapshot>(SerializedSnapshot.Empty);
             }
 
-            return new ValueTask<InMemorySnapshot>(snapshot.Value.Value);
+            return new ValueTask<SerializedSnapshot>(snapshot.Value.Value);
         }
 
         /// <summary>
@@ -53,63 +49,40 @@ namespace Corvus.EventStore.InMemory.Snapshots.Internal
         /// </summary>
         /// <param name="snapshot">The snapshot to store.</param>
         /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-        /// <typeparam name="TSnapshot">The type of the snapshot being written.</typeparam>
-        /// <typeparam name="TMemento">The type of the memento being written.</typeparam>
-        public ValueTask WriteAsync<TSnapshot, TMemento>(in TSnapshot snapshot)
-            where TSnapshot : ISnapshot
+        public Task WriteAsync(in SerializedSnapshot snapshot)
         {
-            var inMemorySnapshot = InMemorySnapshot.CreateFrom<TSnapshot, TMemento>(snapshot);
-
+            SerializedSnapshot localSnapshot = snapshot;
             this.store.AddOrUpdate(
                 snapshot.AggregateId,
                 seq =>
                 {
-                    return new InMemorySnapshotList(ImmutableDictionary<long, InMemorySnapshot>.Empty.Add(inMemorySnapshot.SequenceNumber, inMemorySnapshot));
+                    return new SnapshotList(ImmutableDictionary<long, SerializedSnapshot>.Empty.Add(localSnapshot.SequenceNumber, localSnapshot));
                 },
                 (aggregateId, list) =>
                 {
-                    return list.AddSnapshot(inMemorySnapshot);
+                    return list.AddSnapshot(localSnapshot);
                 });
 
-            return new ValueTask(Task.CompletedTask);
+            return Task.CompletedTask;
         }
 
-        private readonly struct ContinuationToken
+        private readonly struct SnapshotList
         {
-            public ContinuationToken(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
-            {
-                this.FromSequenceNumber = fromSequenceNumber;
-                this.ToSequenceNumber = toSequenceNumber;
-                this.MaxItems = maxItems;
-                this.AggregateId = aggregateId;
-            }
-
-            public long FromSequenceNumber { get; }
-
-            public long ToSequenceNumber { get; }
-
-            public int MaxItems { get; }
-
-            public string AggregateId { get; }
-        }
-
-        private readonly struct InMemorySnapshotList
-        {
-            public InMemorySnapshotList(ImmutableDictionary<long, InMemorySnapshot> snapshots)
+            public SnapshotList(ImmutableDictionary<long, SerializedSnapshot> snapshots)
             {
                 this.Snapshots = snapshots;
             }
 
-            public ImmutableDictionary<long, InMemorySnapshot> Snapshots { get; }
+            public ImmutableDictionary<long, SerializedSnapshot> Snapshots { get; }
 
-            public InMemorySnapshotList AddSnapshot(InMemorySnapshot snapshot)
+            public SnapshotList AddSnapshot(SerializedSnapshot snapshot)
             {
                 if (this.Snapshots.ContainsKey(snapshot.SequenceNumber))
                 {
                     throw new InMemorySnapshotStoreConcurrencyException();
                 }
 
-                return new InMemorySnapshotList(
+                return new SnapshotList(
                     this.Snapshots.Add(snapshot.SequenceNumber, snapshot));
             }
         }
