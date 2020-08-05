@@ -16,7 +16,7 @@ namespace Corvus.EventStore.Example
         /// Initializes a new instance of the <see cref="ToDoListMemento"/> struct.
         /// </summary>
         /// <param name="items">The <see cref="Items"/>.</param>
-        public ToDoListMemento(ImmutableDictionary<Guid, ToDoItem> items)
+        public ToDoListMemento(ImmutableDictionary<Guid, ToDoItemMemento> items)
         {
             this.Items = items;
         }
@@ -24,7 +24,7 @@ namespace Corvus.EventStore.Example
         /// <summary>
         /// Gets the array of to-do items currently in the list.
         /// </summary>
-        public ImmutableDictionary<Guid, ToDoItem> Items { get; }
+        public ImmutableDictionary<Guid, ToDoItemMemento> Items { get; }
 
         /// <summary>
         /// Constructs a memento with the given item added to the list.
@@ -33,7 +33,7 @@ namespace Corvus.EventStore.Example
         /// <returns>A <see cref="ToDoListMemento"/> with the item added.</returns>
         public ToDoListMemento With(ToDoItemAddedEventPayload payload)
         {
-            return new ToDoListMemento(this.GetOrCreateItems().Add(payload.ToDoItemId, new ToDoItem(payload.ToDoItemId, payload.Title)));
+            return new ToDoListMemento(this.GetOrCreateItems().Add(payload.ToDoItemId, new ToDoItemMemento(payload.ToDoItemId, payload.Title)));
         }
 
         /// <summary>
@@ -46,9 +46,9 @@ namespace Corvus.EventStore.Example
             return new ToDoListMemento(this.GetOrCreateItems().Remove(payload.ToDoItemId));
         }
 
-        private ImmutableDictionary<Guid, ToDoItem> GetOrCreateItems()
+        private ImmutableDictionary<Guid, ToDoItemMemento> GetOrCreateItems()
         {
-            return this.Items ?? ImmutableDictionary<Guid, ToDoItem>.Empty;
+            return this.Items ?? ImmutableDictionary<Guid, ToDoItemMemento>.Empty;
         }
     }
 }

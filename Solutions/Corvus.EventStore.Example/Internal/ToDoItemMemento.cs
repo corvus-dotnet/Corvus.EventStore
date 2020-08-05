@@ -1,4 +1,4 @@
-﻿// <copyright file="ToDoItem.cs" company="Endjin Limited">
+﻿// <copyright file="ToDoItemMemento.cs" company="Endjin Limited">
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
@@ -9,14 +9,14 @@ namespace Corvus.EventStore.Example
     /// <summary>
     /// An item in the list maintained by the <see cref="ToDoListMemento"/>.
     /// </summary>
-    internal readonly struct ToDoItem
+    internal readonly struct ToDoItemMemento
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="ToDoItem"/> struct.
+        /// Initializes a new instance of the <see cref="ToDoItemMemento"/> struct.
         /// </summary>
         /// <param name="id">The <see cref="Id"/>.</param>
         /// <param name="title">The <see cref="Title"/>.</param>
-        public ToDoItem(Guid id, string title)
+        public ToDoItemMemento(Guid id, string title)
         {
             this.Id = id;
             this.Title = title;
