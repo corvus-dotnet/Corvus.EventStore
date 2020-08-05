@@ -4,6 +4,7 @@
 
 namespace Corvus.EventStore.Aggregates
 {
+    using System.Collections.Generic;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
     using Corvus.EventStore.Snapshots;
@@ -28,14 +29,13 @@ namespace Corvus.EventStore.Aggregates
         /// <summary>
         /// Applies the given event to the aggregate.
         /// </summary>
-        /// <typeparam name="TEvent">The type of event to apply.</typeparam>
+        /// <typeparam name="TPayload">The payload of the event to apply.</typeparam>
         /// <param name="event">The event to apply.</param>
         /// <remarks>
         /// This will be called when a new event has been created.
         /// </remarks>
         /// <returns>The aggregate with the event applied.</returns>
-        TAggregate ApplyEvent<TEvent>(in TEvent @event)
-            where TEvent : IEvent;
+        TAggregate ApplyEvent<TPayload>(in Event<TPayload> @event);
 
         /// <summary>
         /// Applies the given events to the aggregate.
@@ -45,7 +45,7 @@ namespace Corvus.EventStore.Aggregates
         /// <remarks>
         /// This will typically be called when the aggregate is being rehydrated from stored events.
         /// </remarks>
-        TAggregate ApplyEvents(IEventEnumerator events);
+        TAggregate ApplySerializedEvents(IEnumerable<SerializedEvent> events);
 
         /// <summary>
         /// Stores uncommitted events using the specified event writer.

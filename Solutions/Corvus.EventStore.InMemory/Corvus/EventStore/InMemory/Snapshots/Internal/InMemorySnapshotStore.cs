@@ -2,14 +2,14 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus2.EventStore.InMemory.Snapshots.Internal
+namespace Corvus.EventStore.InMemory.Snapshots.Internal
 {
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Collections.Immutable;
     using System.Linq;
     using System.Threading.Tasks;
-    using Corvus2.EventStore.Snapshots;
+    using Corvus.EventStore.Snapshots;
 
     /// <summary>
     /// Underlying store used by <see cref="InMemorySnapshotReader"/> and <see cref="InMemorySnapshotWriter"/>.

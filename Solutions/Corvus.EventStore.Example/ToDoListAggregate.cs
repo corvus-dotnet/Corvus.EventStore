@@ -7,19 +7,23 @@
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
     using Corvus.EventStore.Core;
+    using Corvus.EventStore.Serialization;
+    using Corvus.EventStore.Serialization.Json;
     using Corvus.EventStore.Snapshots;
 
     public readonly struct ToDoListAggregate : IAggregateRoot<ToDoListAggregate>
     {
-        private readonly ImmutableList<IEvent> uncommittedEvents;
+        private readonly ImmutableList<SerializedEvent> uncommittedEvents;
 
         private readonly ToDoListMemento taskListMemento;
+
+        public static IEventSerializer EventSerializer = new Utf8JsonEventSerializer();
 
         public ToDoListAggregate(
             string aggregateId,
             long sequenceNumber,
             ToDoListMemento memento,
-            ImmutableList<IEvent> uncommittedEvents)
+            ImmutableList<SerializedEvent> uncommittedEvents)
         {
 #if DEBUG
             Debug.Assert(uncommittedEvents.Count == 0 || uncommittedEvents[^1].SequenceNumber == sequenceNumber);
@@ -41,7 +45,7 @@
                 title,
                 description);
 
-            var newEvent = new Event<ToDoItemAddedEventPayload>(
+            var newEvent = new SerializedEvent(
                 this.AggregateId,
                 ToDoItemAddedEventPayload.EventType,
                 this.SequenceNumber + 1,

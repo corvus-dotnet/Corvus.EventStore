@@ -2,7 +2,7 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus2.EventStore.InMemory.Core.Internal
+namespace Corvus.EventStore.InMemory.Core.Internal
 {
     using System;
 

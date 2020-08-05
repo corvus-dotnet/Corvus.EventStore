@@ -2,11 +2,11 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus2.EventStore.InMemory.Snapshots
+namespace Corvus.EventStore.InMemory.Snapshots
 {
     using System.Threading.Tasks;
-    using Corvus2.EventStore.InMemory.Snapshots.Internal;
-    using Corvus2.EventStore.Snapshots;
+    using Corvus.EventStore.InMemory.Snapshots.Internal;
+    using Corvus.EventStore.Snapshots;
 
     /// <summary>
     /// In-memory implementation of <see cref="ISnapshotWriter"/>.

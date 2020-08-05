@@ -2,7 +2,7 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus2.EventStore.Snapshots
+namespace Corvus.EventStore.Snapshots
 {
     using System;
 
@@ -21,7 +21,7 @@ namespace Corvus2.EventStore.Snapshots
         /// </summary>
         /// <param name="aggregateId">The Id of the aggregate to which this snapshot is applied.</param>
         /// <param name="sequenceNumber">The <see cref="SequenceNumber"/>.</param>
-        /// <param name="utf8TextMemento">The <see cref="Utf8TextMemento"/>.</param>
+        /// <param name="utf8TextMemento">The <see cref="Memento"/>.</param>
         public SerializedSnapshot(
             string aggregateId,
             long sequenceNumber,
@@ -29,7 +29,7 @@ namespace Corvus2.EventStore.Snapshots
         {
             this.AggregateId = aggregateId;
             this.SequenceNumber = sequenceNumber;
-            this.Utf8TextMemento = utf8TextMemento;
+            this.Memento = utf8TextMemento;
             this.IsEmpty = false;
         }
 
@@ -39,7 +39,7 @@ namespace Corvus2.EventStore.Snapshots
         /// <param name="isEmpty">Indicates whether the snapshot is empty.</param>
         /// <param name="aggregateId">The Id of the aggregate to which this snapshot is applied.</param>
         /// <param name="sequenceNumber">The <see cref="SequenceNumber"/>.</param>
-        /// <param name="utf8TextMemento">The <see cref="Utf8TextMemento"/>.</param>
+        /// <param name="utf8TextMemento">The <see cref="Memento"/>.</param>
         public SerializedSnapshot(
             bool isEmpty,
             string aggregateId,
@@ -49,7 +49,7 @@ namespace Corvus2.EventStore.Snapshots
             this.IsEmpty = isEmpty;
             this.AggregateId = aggregateId;
             this.SequenceNumber = sequenceNumber;
-            this.Utf8TextMemento = utf8TextMemento;
+            this.Memento = utf8TextMemento;
             this.IsEmpty = false;
         }
 
@@ -73,6 +73,6 @@ namespace Corvus2.EventStore.Snapshots
         /// <summary>
         /// Gets the memento data for the snapshot.
         /// </summary>
-        public ReadOnlyMemory<byte> Utf8TextMemento { get; }
+        public ReadOnlyMemory<byte> Memento { get; }
     }
 }

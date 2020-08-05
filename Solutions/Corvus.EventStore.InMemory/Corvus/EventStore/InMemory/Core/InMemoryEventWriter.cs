@@ -2,12 +2,12 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus2.EventStore.InMemory.Core
+namespace Corvus.EventStore.InMemory.Core
 {
     using System.Collections.Generic;
     using System.Threading.Tasks;
-    using Corvus2.EventStore.Core;
-    using Corvus2.EventStore.InMemory.Core.Internal;
+    using Corvus.EventStore.Core;
+    using Corvus.EventStore.InMemory.Core.Internal;
 
     /// <summary>
     /// In-memory implementation of <see cref="IEventWriter"/>.

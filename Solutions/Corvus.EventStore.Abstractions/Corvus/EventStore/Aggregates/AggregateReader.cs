@@ -14,18 +14,16 @@ namespace Corvus.EventStore.Aggregates
     /// </summary>
     /// <typeparam name="TEventReader">The type of the underlying event reader.</typeparam>
     /// <typeparam name="TSnapshotReader">The type of the underlying snapshot reader.</typeparam>
-    /// <typeparam name="TSnapshot">The underlying snapshot type created by the snapshot reader implementation.</typeparam>
     /// <typeparam name="TMemento">The memento type used by the aggregate that can be read by this reader.</typeparam>
-    public readonly struct AggregateReader<TEventReader, TSnapshotReader, TSnapshot, TMemento>
+    public readonly struct AggregateReader<TEventReader, TSnapshotReader, TMemento>
         where TEventReader : IEventReader
         where TSnapshotReader : ISnapshotReader
-        where TSnapshot : ISnapshot
     {
         private readonly TEventReader eventReader;
         private readonly TSnapshotReader snapshotReader;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AggregateReader{TEventReader, TSnapshotReader, TSnapshot, TMemento}"/> struct.
+        /// Initializes a new instance of the <see cref="AggregateReader{TEventReader, TSnapshotReader, TMemento}"/> struct.
         /// </summary>
         /// <param name="eventReader">The underlying event reader.</param>
         /// <param name="snapshotReader">The underlying snapshot reader.</param>
@@ -39,8 +37,7 @@ namespace Corvus.EventStore.Aggregates
         /// Reads the aggregate with the specified Id.
         /// </summary>
         /// <typeparam name="TAggregate">The type of aggregate being read.</typeparam>
-        /// <param name="aggregateFactory">A factory method for creating an aggregate from the supplied memento.</param>
-        /// <param name="defaultPayloadFactory">A factory method for creating a default snapshot payload if one cannot be found.</param>
+        /// <param name="aggregateFactory">A factory method for creating an aggregate from a snapshot.</param>
         /// <param name="aggregateId">The Id of the aggregate.</param>
         /// <param name="sequenceNumber">The maximum sequence number to retrieve.</param>
         /// <returns>The specified aggregate.</returns>
@@ -49,18 +46,17 @@ namespace Corvus.EventStore.Aggregates
         /// than or equal to the specified value.
         /// </remarks>
         public async ValueTask<TAggregate> ReadAsync<TAggregate>(
-            Func<TSnapshot, TAggregate> aggregateFactory,
-            Func<TMemento> defaultPayloadFactory,
+            Func<SerializedSnapshot, TAggregate> aggregateFactory,
             string aggregateId,
             long sequenceNumber = long.MaxValue)
             where TAggregate : IAggregateRoot<TAggregate>
         {
-            TSnapshot snapshot = await this.snapshotReader.ReadAsync<TSnapshot, TMemento>(defaultPayloadFactory, aggregateId, sequenceNumber).ConfigureAwait(false);
-            TAggregate aggregate = aggregateFactory(snapshot);
+            SerializedSnapshot serializedSnapshot = await this.snapshotReader.ReadAsync(aggregateId, sequenceNumber).ConfigureAwait(false);
+            TAggregate aggregate = aggregateFactory(serializedSnapshot);
 
             if (aggregate.SequenceNumber < sequenceNumber)
             {
-                IEventReaderResult newEvents = await this.eventReader.ReadAsync(
+                EventReaderResult newEvents = await this.eventReader.ReadAsync(
                     aggregate.AggregateId,
                     aggregate.SequenceNumber + 1,
                     sequenceNumber,
@@ -68,14 +64,14 @@ namespace Corvus.EventStore.Aggregates
 
                 while (true)
                 {
-                    aggregate = aggregate.ApplyEvents(newEvents.Events);
+                    aggregate = aggregate.ApplySerializedEvents(newEvents.Events);
 
-                    if (string.IsNullOrEmpty(newEvents.ContinuationToken))
+                    if (newEvents.ContinuationToken is null)
                     {
                         break;
                     }
 
-                    newEvents = await this.eventReader.ReadAsync(newEvents.ContinuationToken).ConfigureAwait(false);
+                    newEvents = await this.eventReader.ReadAsync(newEvents.ContinuationToken.Value.Span).ConfigureAwait(false);
                 }
             }
 

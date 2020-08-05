@@ -2,7 +2,7 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus2.EventStore.InMemory.Core.Internal
+namespace Corvus.EventStore.InMemory.Core.Internal
 {
     using System;
     using System.Collections.Concurrent;
@@ -11,8 +11,8 @@ namespace Corvus2.EventStore.InMemory.Core.Internal
     using System.Linq;
     using System.Text.Json;
     using System.Threading.Tasks;
+    using Corvus.EventStore.Core;
     using Corvus.Extensions;
-    using Corvus2.EventStore.Core;
 
     /// <summary>
     /// Underlying store used by <see cref="InMemoryEventReader"/> and <see cref="InMemoryEventReader"/>.
@@ -26,8 +26,8 @@ namespace Corvus2.EventStore.InMemory.Core.Internal
         /// Reads events from the store for an aggregate.
         /// </summary>
         /// <param name="aggregateId">The Id of the aggregate to retrieve events for.</param>
-        /// <param name="fromSequenceNumber">The minimum <see cref="IEvent.SequenceNumber"/> to retrieve.</param>
-        /// <param name="toSequenceNumber">The maximum <see cref="IEvent.SequenceNumber"/> to retreive.</param>
+        /// <param name="fromSequenceNumber">The minimum <see cref="Event{T}.SequenceNumber"/> to retrieve.</param>
+        /// <param name="toSequenceNumber">The maximum <see cref="Event{T}.SequenceNumber"/> to retreive.</param>
         /// <param name="maxItems">The maximum number of items to return.</param>
         /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
         public ValueTask<EventReaderResult> ReadAsync(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)

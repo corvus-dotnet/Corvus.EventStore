@@ -10,7 +10,7 @@ namespace Corvus.EventStore.Core
     /// Represents an event created by an Aggregate Root that can be stored by an <see cref="IEventWriter"/>.
     /// </summary>
     /// <typeparam name="TPayload">The type of the payload.</typeparam>
-    public readonly struct Event<TPayload> : IEvent
+    public readonly struct Event<TPayload>
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="Event{TPayload}"/> struct.
@@ -37,35 +37,40 @@ namespace Corvus.EventStore.Core
             this.Payload = payload;
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets the Id of the aggregate to which this event is applied.
+        /// </summary>
         public string AggregateId { get; }
 
-        /// <inheritdoc/>
-        public long SequenceNumber { get; }
-
-        /// <inheritdoc/>
-        public string PartitionKey { get; }
-
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets the unique name for the type of event that this data represents.
+        /// </summary>
+        /// <remarks>
+        /// It is recommended that some type of namespaced name is used, ideally with a scheme that provides for a
+        /// version number.
+        /// </remarks>
         public string EventType { get; }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets the partition key for the event.
+        /// </summary>
+        public string PartitionKey { get; }
+
+        /// <summary>
+        /// Gets the nominal wall clock timestamp for the event as determined by the creator of the event.
+        /// </summary>
         public long Timestamp { get; }
+
+        /// <summary>
+        /// Gets the sequence number for the event.
+        /// </summary>
+        /// <remarks>
+        /// This is a monotonically incrementing value for the aggregate to which the event belongs.</remarks>
+        public long SequenceNumber { get; }
 
         /// <summary>
         /// Gets the payload data for the event.
         /// </summary>
         public TPayload Payload { get; }
-
-        /// <inheritdoc/>
-        public TTarget GetPayload<TTarget>()
-        {
-            if (this.Payload is TTarget result)
-            {
-                return result;
-            }
-
-            throw new InvalidOperationException();
-        }
     }
 }

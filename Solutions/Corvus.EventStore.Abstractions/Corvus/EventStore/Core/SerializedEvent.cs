@@ -2,12 +2,12 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus2.EventStore.Core
+namespace Corvus.EventStore.Core
 {
     using System;
 
     /// <summary>
-    /// Represents an event serialized to a UTF8-encoded text array.
+    /// Represents an event serialized to a byte array.
     /// </summary>
     public readonly struct SerializedEvent
     {
@@ -19,21 +19,21 @@ namespace Corvus2.EventStore.Core
         /// <param name="sequenceNumber">The <see cref="SequenceNumber"/>.</param>
         /// <param name="timestamp">The <see cref="Timestamp"/>.</param>
         /// <param name="partitionKey">The <see cref="PartitionKey"/>.</param>
-        /// <param name="utf8TextPayload">The <see cref="Utf8TextPayload"/>.</param>
+        /// <param name="payload">The <see cref="Payload"/>.</param>
         public SerializedEvent(
             string aggregateId,
             string eventType,
             long sequenceNumber,
             long timestamp,
             string partitionKey,
-            ReadOnlyMemory<byte> utf8TextPayload)
+            ReadOnlyMemory<byte> payload)
         {
             this.AggregateId = aggregateId;
             this.EventType = eventType;
             this.SequenceNumber = sequenceNumber;
             this.Timestamp = timestamp;
             this.PartitionKey = partitionKey;
-            this.Utf8TextPayload = utf8TextPayload;
+            this.Payload = payload;
         }
 
         /// <summary>
@@ -70,6 +70,6 @@ namespace Corvus2.EventStore.Core
         /// <summary>
         /// Gets the payload data for the event.
         /// </summary>
-        public ReadOnlyMemory<byte> Utf8TextPayload { get; }
+        public ReadOnlyMemory<byte> Payload { get; }
     }
 }

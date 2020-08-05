@@ -4,7 +4,7 @@
 
     public readonly struct ToDoList
     {
-        public ToDoList(ToDoListAggregate toDoListAggregate)
+        public ToDoList(in ToDoListAggregate toDoListAggregate)
         {
             this.ToDoListAggregate = toDoListAggregate;
         }

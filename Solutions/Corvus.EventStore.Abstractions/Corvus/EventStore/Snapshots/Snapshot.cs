@@ -4,39 +4,39 @@
 
 namespace Corvus.EventStore.Snapshots
 {
-    using System;
-
     /// <summary>
     /// Represents a snapshot of an aggregate at a point in its history.
     /// </summary>
-    /// <typeparam name="TMemento">The type of the memento produced by the source aggregate.</typeparam>
-    public readonly struct Snapshot<TMemento> : ISnapshot
+    /// <typeparam name="TMemento">The type of the memento in the snapshot.</typeparam>
+    public readonly struct Snapshot<TMemento>
+        where TMemento : new()
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="Snapshot{TMemento}"/> struct.
         /// </summary>
-        /// <param name="aggregateId">The Id of the aggregate that created the snapshot.</param>
+        /// <param name="aggregateId">The <see cref="AggregateId"/>.</param>
         /// <param name="sequenceNumber">The <see cref="SequenceNumber"/>.</param>
-        /// <param name="payload">The <see cref="Payload"/>.</param>
-        public Snapshot(string aggregateId, long sequenceNumber, TMemento payload)
+        /// <param name="memento">The <see cref="Memento"/>.</param>
+        public Snapshot(string aggregateId, long sequenceNumber, TMemento memento)
         {
-            this.SequenceNumber = sequenceNumber;
-            this.Payload = payload;
             this.AggregateId = aggregateId;
+            this.SequenceNumber = sequenceNumber;
+            this.Memento = memento;
         }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets the Id of the aggregate from which this snapshot was generated.
+        /// </summary>
         public string AggregateId { get; }
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Gets the sequence number for the snapshot.
+        /// </summary>
         public long SequenceNumber { get; }
 
         /// <summary>
         /// Gets the memoized version of the aggregate for the snapshot.
         /// </summary>
-        public TMemento Payload { get; }
-
-        /// <inheritdoc/>
-        public TTargetType GetPayload<TTargetType>() => this.Payload is TTargetType target ? target : throw new InvalidOperationException();
+        public TMemento Memento { get; }
     }
 }

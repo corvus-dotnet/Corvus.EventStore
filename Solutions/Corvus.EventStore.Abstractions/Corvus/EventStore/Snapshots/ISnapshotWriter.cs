@@ -16,9 +16,6 @@ namespace Corvus.EventStore.Snapshots
         /// </summary>
         /// <param name="snapshot">The snapshot to store.</param>
         /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-        /// <typeparam name="TSnapshot">The type of the snapshot being written.</typeparam>
-        /// <typeparam name="TMemento">The type of the memento being written.</typeparam>
-        ValueTask WriteAsync<TSnapshot, TMemento>(in TSnapshot snapshot)
-            where TSnapshot : ISnapshot;
+        Task WriteAsync(in SerializedSnapshot snapshot);
     }
 }
