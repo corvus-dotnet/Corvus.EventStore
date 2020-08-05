@@ -73,22 +73,7 @@ namespace Corvus.EventStore.Example
         /// <inheritdoc/>
         public ToDoListAggregate ApplySerializedEvents(in IEnumerable<SerializedEvent> events)
         {
-            long previousSequenceNumber = this.SequenceNumber;
-
-            foreach (SerializedEvent @event in events)
-            {
-                if (@event.AggregateId != this.AggregateId)
-                {
-                    throw new InvalidOperationException($"Incorrect aggregate Id for event with sequence number {@event.SequenceNumber}. Expected {this.AggregateId}, actual {@event.AggregateId}");
-                }
-
-                if (@event.SequenceNumber != previousSequenceNumber + 1)
-                {
-                    throw new InvalidOperationException($"Incorrect sequence number. Expected {previousSequenceNumber + 1}, actual {@event.SequenceNumber}");
-                }
-
-                ++previousSequenceNumber;
-            }
+            events.ValidateEvents(this.AggregateId, this.SequenceNumber);
 
             ToDoListAggregate aggregate = this;
 
