@@ -2,11 +2,12 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.InMemory.Core
+namespace Corvus2.EventStore.InMemory.Core
 {
+    using System;
     using System.Threading.Tasks;
-    using Corvus.EventStore.Core;
-    using Corvus.EventStore.InMemory.Core.Internal;
+    using Corvus2.EventStore.Core;
+    using Corvus2.EventStore.InMemory.Core.Internal;
 
     /// <summary>
     /// In-memory implementation of <see cref="IEventReader"/>.
@@ -25,15 +26,15 @@ namespace Corvus.EventStore.InMemory.Core
         }
 
         /// <inheritdoc/>
-        public ValueTask<IEventReaderResult> ReadAsync(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
+        public ValueTask<EventReaderResult> ReadAsync(ReadOnlySpan<byte> utf8TextContinuationToken)
         {
-            return this.store.ReadAsync(aggregateId, fromSequenceNumber, toSequenceNumber, maxItems);
+            return this.store.ReadAsync(utf8TextContinuationToken);
         }
 
         /// <inheritdoc/>
-        public ValueTask<IEventReaderResult> ReadAsync(string continuationToken)
+        public ValueTask<EventReaderResult> ReadAsync(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
         {
-            return this.store.ReadAsync(continuationToken);
+            return this.store.ReadAsync(aggregateId, fromSequenceNumber, toSequenceNumber, maxItems);
         }
     }
 }

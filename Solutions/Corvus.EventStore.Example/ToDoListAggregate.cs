@@ -137,7 +137,13 @@
 
         public ValueTask<ToDoListAggregate> StoreAsync<TEventWriter>(in TEventWriter writer) where TEventWriter : IEventWriter
         {
-            throw new NotImplementedException();
+            var events = this.uncommittedEvents.Select(e => );
+        }
+
+        private void WriteEventToBatch<TEvent, TPayload>(IEventBatchWriter writer, in TEvent @event)
+            where TEvent : IEvent
+        {
+            writer.WriteBatchItemAsync<TEvent, TPayload>(@event);
         }
 
         public ValueTask<ToDoListAggregate> StoreSnapshotAsync<TSnapshotWriter>(in TSnapshotWriter writer) where TSnapshotWriter : ISnapshotWriter

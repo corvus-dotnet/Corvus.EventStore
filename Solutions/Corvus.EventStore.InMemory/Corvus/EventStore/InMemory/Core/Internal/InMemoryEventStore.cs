@@ -2,7 +2,7 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.InMemory.Core.Internal
+namespace Corvus2.EventStore.InMemory.Core.Internal
 {
     using System;
     using System.Collections.Concurrent;
@@ -11,16 +11,16 @@ namespace Corvus.EventStore.InMemory.Core.Internal
     using System.Linq;
     using System.Text.Json;
     using System.Threading.Tasks;
-    using Corvus.EventStore.Core;
     using Corvus.Extensions;
+    using Corvus2.EventStore.Core;
 
     /// <summary>
-    /// Underlying store used by <see cref="InMemoryEventReader"/> and <see cref="InMemoryEventWriter"/>.
+    /// Underlying store used by <see cref="InMemoryEventReader"/> and <see cref="InMemoryEventReader"/>.
     /// </summary>
     public class InMemoryEventStore
     {
-        private readonly ConcurrentDictionary<string, InMemoryEventList> store =
-            new ConcurrentDictionary<string, InMemoryEventList>();
+        private readonly ConcurrentDictionary<string, SerializedEventList> store =
+            new ConcurrentDictionary<string, SerializedEventList>();
 
         /// <summary>
         /// Reads events from the store for an aggregate.
@@ -29,30 +29,29 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         /// <param name="fromSequenceNumber">The minimum <see cref="IEvent.SequenceNumber"/> to retrieve.</param>
         /// <param name="toSequenceNumber">The maximum <see cref="IEvent.SequenceNumber"/> to retreive.</param>
         /// <param name="maxItems">The maximum number of items to return.</param>
-        /// <returns>The results, contained in an <see cref="IEventReaderResult"/>.</returns>
-        public ValueTask<IEventReaderResult> ReadAsync(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
+        /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
+        public ValueTask<EventReaderResult> ReadAsync(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
         {
-            if (!this.store.TryGetValue(aggregateId, out InMemoryEventList list))
+            if (!this.store.TryGetValue(aggregateId, out SerializedEventList list))
             {
-                return new ValueTask<IEventReaderResult>(new InMemoryEventReaderResult(Enumerable.Empty<InMemoryEvent>(), null));
+                return new ValueTask<EventReaderResult>(new EventReaderResult(Enumerable.Empty<SerializedEvent>(), null));
             }
 
-            InMemoryEvent[] events = list.Events
+            SerializedEvent[] events = list.Events
                 .Where(item => item.Key >= fromSequenceNumber && item.Key <= toSequenceNumber)
                 .Take(maxItems)
                 .Select(item => item.Value)
                 .ToArray();
 
-            string? encodedContinuationToken = null;
-
             if (events.Length == maxItems)
             {
                 var continuationToken = new ContinuationToken(aggregateId, fromSequenceNumber + maxItems, toSequenceNumber, maxItems);
 
-                encodedContinuationToken = JsonSerializer.Serialize(continuationToken).Base64UrlEncode();
+                byte[] encodedContinuationToken = JsonSerializer.SerializeToUtf8Bytes(continuationToken);
+                return new ValueTask<EventReaderResult>(new EventReaderResult(events, encodedContinuationToken));
             }
 
-            return new ValueTask<IEventReaderResult>(new InMemoryEventReaderResult(events, encodedContinuationToken));
+            return new ValueTask<EventReaderResult>(new EventReaderResult(events, null));
         }
 
         /// <summary>
@@ -60,10 +59,10 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         /// </summary>
         /// <param name="encodedContinuationToken">A continuation token returned from a previous call that can be used to
         /// obtain the next set of results.</param>
-        /// <returns>The results, contained in an <see cref="IEventReaderResult"/>.</returns>
-        public ValueTask<IEventReaderResult> ReadAsync(string encodedContinuationToken)
+        /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
+        public ValueTask<EventReaderResult> ReadAsync(ReadOnlySpan<byte> encodedContinuationToken)
         {
-            ContinuationToken continuationToken = JsonSerializer.Deserialize<ContinuationToken>(encodedContinuationToken.Base64UrlDecode());
+            ContinuationToken continuationToken = JsonSerializer.Deserialize<ContinuationToken>(encodedContinuationToken);
 
             return this.ReadAsync(continuationToken.AggregateId, continuationToken.FromSequenceNumber, continuationToken.ToSequenceNumber, continuationToken.MaxItems);
         }
@@ -71,30 +70,21 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         /// <summary>
         /// Writes the supplied events to the store as a single transaction.
         /// </summary>
-        /// <param name="eventWrites">The write instructions.</param>
+        /// <param name="inMemoryEvents">The <see cref="SerializedEvent"/>s to write.</param>
         /// <returns>A task that completes when the events have been written to the store.</returns>
-        public ValueTask WriteBatchAsync(params Action<IEventBatchWriter>[] eventWrites)
+        public Task WriteAsync(params SerializedEvent[] inMemoryEvents)
         {
-            InMemoryStoreEventBatchWriter batch = default;
-
-            foreach (Action<IEventBatchWriter> writer in eventWrites)
-            {
-                writer(batch);
-            }
-
-            ImmutableArray<InMemoryEvent> events = batch.Events;
-
-            return this.WriteInMemoryEvents(events);
+            return this.WriteSerializedEvents(ImmutableArray<SerializedEvent>.Empty.AddRange(inMemoryEvents));
         }
 
         /// <summary>
         /// Writes the supplied events to the store as a single transaction.
         /// </summary>
-        /// <param name="inMemoryEvents">The <see cref="InMemoryEvent"/>s to write.</param>
+        /// <param name="inMemoryEvents">The <see cref="SerializedEvent"/>s to write.</param>
         /// <returns>A task that completes when the events have been written to the store.</returns>
-        public ValueTask WriteAsync(params InMemoryEvent[] inMemoryEvents)
+        public Task WriteAsync(in IEnumerable<SerializedEvent> inMemoryEvents)
         {
-            return this.WriteInMemoryEvents(ImmutableArray.Create(inMemoryEvents));
+            return this.WriteSerializedEvents(ImmutableArray<SerializedEvent>.Empty.AddRange(inMemoryEvents));
         }
 
         /// <summary>
@@ -102,7 +92,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         /// </summary>
         /// <param name="event">The event to write.</param>
         /// <returns>A task that completes when the events have been written to the store.</returns>
-        public ValueTask WriteAsync(InMemoryEvent @event)
+        public Task WriteAsync(SerializedEvent @event)
         {
             this.store.AddOrUpdate(
                 @event.AggregateId,
@@ -113,7 +103,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return new InMemoryEventList(0, ImmutableDictionary<long, InMemoryEvent>.Empty.Add(0, @event));
+                    return new SerializedEventList(0, ImmutableDictionary<long, SerializedEvent>.Empty.Add(0, @event));
                 },
                 (aggregateId, list) =>
                 {
@@ -127,17 +117,17 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return list.AddEvents(ImmutableArray<InMemoryEvent>.Empty.Add(@event));
+                    return list.AddEvents(ImmutableArray<SerializedEvent>.Empty.Add(@event));
                 });
 
-            return new ValueTask(Task.CompletedTask);
+            return Task.CompletedTask;
         }
 
-        private ValueTask WriteInMemoryEvents(ImmutableArray<InMemoryEvent> events)
+        private Task WriteSerializedEvents(ImmutableArray<SerializedEvent> events)
         {
             if (events.Length == 0)
             {
-                return new ValueTask(Task.CompletedTask);
+                return Task.CompletedTask;
             }
 
             string aggregateId = events[0].AggregateId;
@@ -164,7 +154,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return new InMemoryEventList(0, ImmutableDictionary<long, InMemoryEvent>.Empty.AddRange(events.Select(ev => KeyValuePair.Create(ev.SequenceNumber, ev))));
+                    return new SerializedEventList(0, ImmutableDictionary<long, SerializedEvent>.Empty.AddRange(events.Select(ev => KeyValuePair.Create(ev.SequenceNumber, ev))));
                 },
                 (aggregateId, list) =>
                 {
@@ -181,7 +171,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                     return list.AddEvents(events);
                 });
 
-            return new ValueTask(Task.CompletedTask);
+            return Task.CompletedTask;
         }
 
         private readonly struct ContinuationToken
@@ -203,9 +193,9 @@ namespace Corvus.EventStore.InMemory.Core.Internal
             public string AggregateId { get; }
         }
 
-        private readonly struct InMemoryEventList
+        private readonly struct SerializedEventList
         {
-            public InMemoryEventList(long eTag, ImmutableDictionary<long, InMemoryEvent> events)
+            public SerializedEventList(long eTag, ImmutableDictionary<long, SerializedEvent> events)
             {
                 this.Events = events;
                 this.LastSequenceNumber = eTag;
@@ -213,31 +203,13 @@ namespace Corvus.EventStore.InMemory.Core.Internal
 
             public long LastSequenceNumber { get; }
 
-            public ImmutableDictionary<long, InMemoryEvent> Events { get; }
+            public ImmutableDictionary<long, SerializedEvent> Events { get; }
 
-            public InMemoryEventList AddEvents(ImmutableArray<InMemoryEvent> events)
+            public SerializedEventList AddEvents(ImmutableArray<SerializedEvent> events)
             {
-                return new InMemoryEventList(
+                return new SerializedEventList(
                     this.LastSequenceNumber + 1,
                     this.Events.AddRange(events.Select(ev => KeyValuePair.Create(ev.SequenceNumber, ev))));
-            }
-        }
-
-        private struct InMemoryStoreEventBatchWriter : IEventBatchWriter
-        {
-            private List<InMemoryEvent>? events;
-
-            public ImmutableArray<InMemoryEvent> Events => ImmutableArray<InMemoryEvent>.Empty.AddRange(this.events);
-
-            public void WriteBatchItemAsync<TEvent, TPayload>(in TEvent @event)
-                where TEvent : IEvent
-            {
-                if (this.events is null)
-                {
-                    this.events = new List<InMemoryEvent>();
-                }
-
-                this.events.Add(InMemoryEvent.CreateFrom<TEvent, TPayload>(@event));
             }
         }
     }
