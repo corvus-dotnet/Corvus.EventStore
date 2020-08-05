@@ -28,7 +28,7 @@ namespace Corvus.EventStore.Core
                 if (@event.AggregateId != aggregateId)
                 {
                     // TODO: consider a custom exception
-                    throw new InvalidOperationException($"Incorrect aggregate Id for event with sequence number {@event.SequenceNumber}. Expected {this.AggregateId}, actual {@event.AggregateId}");
+                    throw new InvalidOperationException($"Incorrect aggregate Id for event with sequence number {@event.SequenceNumber}. Expected {aggregateId}, actual {@event.AggregateId}");
                 }
 
                 if (@event.SequenceNumber != previousSequenceNumber + 1)

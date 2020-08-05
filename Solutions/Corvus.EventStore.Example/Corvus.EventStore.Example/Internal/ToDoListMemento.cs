@@ -2,7 +2,7 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.Example
+namespace Corvus.EventStore.Example.Internal
 {
     using System;
     using System.Collections.Immutable;

@@ -10,6 +10,7 @@ namespace Corvus.EventStore.Example
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
     using Corvus.EventStore.Core;
+    using Corvus.EventStore.Example.Internal;
     using Corvus.EventStore.Serialization;
     using Corvus.EventStore.Serialization.Json;
     using Corvus.EventStore.Snapshots;

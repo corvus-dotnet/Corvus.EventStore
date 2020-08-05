@@ -19,4 +19,8 @@
     <ProjectReference Include="..\Corvus.EventStore.Serialization.Text.Json\Corvus.EventStore.Serialization.Text.Json.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="../PackageIcon.png" Link="PackageIcon.png" />
+  </ItemGroup>
+
 </Project>
