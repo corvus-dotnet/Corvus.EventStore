@@ -30,11 +30,13 @@ namespace Corvus.EventStore.Example
         /// Initializes a new instance of the <see cref="ToDoListAggregate"/> struct.
         /// </summary>
         /// <param name="aggregateId">The <see cref="AggregateId"/>.</param>
+        /// <param name="sequenceNumber">The <see cref="SequenceNumber"/>.</param>
         /// <param name="uncommittedEvents">The <see cref="uncommittedEvents"/>.</param>
         /// <param name="memento">The <see cref="memento"/>.</param>
-        private ToDoListAggregate(in string aggregateId, in ImmutableArray<SerializedEvent> uncommittedEvents, in ToDoListMemento memento)
+        private ToDoListAggregate(string aggregateId, long sequenceNumber, in ImmutableArray<SerializedEvent> uncommittedEvents, in ToDoListMemento memento)
         {
             this.AggregateId = aggregateId;
+            this.SequenceNumber = sequenceNumber;
             this.uncommittedEvents = uncommittedEvents;
             this.memento = memento;
         }
@@ -53,7 +55,7 @@ namespace Corvus.EventStore.Example
         public string AggregateId { get; }
 
         /// <inheritdoc/>
-        public long SequenceNumber => this.uncommittedEvents[^0].SequenceNumber;
+        public long SequenceNumber { get; }
 
         /// <inheritdoc/>
         public ToDoListAggregate ApplyEvent<TPayload>(in Event<TPayload> @event)
@@ -65,7 +67,7 @@ namespace Corvus.EventStore.Example
 
             // Add our uncommitted event
             SerializedEvent serializedEvent = EventSerializer.Serialize(@event);
-            return new ToDoListAggregate(this.AggregateId, this.uncommittedEvents.Add(serializedEvent), updatedMemento);
+            return new ToDoListAggregate(this.AggregateId, this.SequenceNumber + 1, this.uncommittedEvents.Add(serializedEvent), updatedMemento);
         }
 
         /// <inheritdoc/>
@@ -93,7 +95,7 @@ namespace Corvus.EventStore.Example
             }
 
             await writer.WriteBatchAsync(this.uncommittedEvents).ConfigureAwait(false);
-            return new ToDoListAggregate(this.AggregateId, ImmutableArray<SerializedEvent>.Empty, this.memento);
+            return new ToDoListAggregate(this.AggregateId, this.SequenceNumber, ImmutableArray<SerializedEvent>.Empty, this.memento);
         }
 
         /// <inheritdoc/>
@@ -136,12 +138,12 @@ namespace Corvus.EventStore.Example
 
         private ToDoListAggregate HandleToDoItemAdded(in Event<ToDoItemAddedEventPayload> @event)
         {
-            return new ToDoListAggregate(this.AggregateId, this.uncommittedEvents, this.memento.With(@event.Payload));
+            return new ToDoListAggregate(this.AggregateId, this.SequenceNumber + 1, this.uncommittedEvents, this.memento.With(@event.Payload));
         }
 
         private ToDoListAggregate HandleToDoItemRemoved(in Event<ToDoItemRemovedEventPayload> @event)
         {
-            return new ToDoListAggregate(this.AggregateId, this.uncommittedEvents, this.memento.With(@event.Payload));
+            return new ToDoListAggregate(this.AggregateId, this.SequenceNumber + 1, this.uncommittedEvents, this.memento.With(@event.Payload));
         }
 
         private void Validate<TPayload>(in Event<TPayload> @event)
