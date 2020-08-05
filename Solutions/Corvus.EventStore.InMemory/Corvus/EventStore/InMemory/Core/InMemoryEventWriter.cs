@@ -26,13 +26,13 @@ namespace Corvus.EventStore.InMemory.Core
         }
 
         /// <inheritdoc/>
-        public Task WriteAsync(in SerializedEvent @event)
+        public Task WriteAsync(SerializedEvent @event)
         {
             return this.store.WriteAsync(@event);
         }
 
         /// <inheritdoc/>
-        public Task WriteBatchAsync(in IEnumerable<SerializedEvent> events)
+        public Task WriteBatchAsync(IEnumerable<SerializedEvent> events)
         {
             return this.store.WriteAsync(events);
         }

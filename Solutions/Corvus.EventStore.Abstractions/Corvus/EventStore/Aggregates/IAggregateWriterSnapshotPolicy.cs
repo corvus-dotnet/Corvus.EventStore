@@ -18,6 +18,6 @@ namespace Corvus.EventStore.Aggregates
         /// <param name="aggregate">The aggregate.</param>
         /// <param name="timestamp">The nominal current wall clock timestamp as determined by the caller.</param>
         /// <returns>True if a new snapshot should be created, false otherwise.</returns>
-        bool ShouldSnapshot(TAggregate aggregate, long timestamp);
+        bool ShouldSnapshot(in TAggregate aggregate, long timestamp);
     }
 }

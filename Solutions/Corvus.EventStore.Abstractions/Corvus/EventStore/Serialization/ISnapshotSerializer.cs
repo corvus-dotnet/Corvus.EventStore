@@ -17,7 +17,7 @@ namespace Corvus.EventStore.Serialization
         /// <typeparam name="TMemento">The type of the memento to deserialize.</typeparam>
         /// <param name="snapshot">The snapshot to deserialize.</param>
         /// <returns>The deserialized Snapshot.</returns>
-        Snapshot<TMemento> Deserialize<TMemento>(SerializedSnapshot snapshot)
+        Snapshot<TMemento> Deserialize<TMemento>(in SerializedSnapshot snapshot)
             where TMemento : new();
 
         /// <summary>
@@ -26,7 +26,7 @@ namespace Corvus.EventStore.Serialization
         /// <typeparam name="TMemento">The type of the memento to deserialize.</typeparam>
         /// <param name="snapshot">The Snapshot to serialize.</param>
         /// <returns>A <see cref="SerializedSnapshot"/> representing the given Snapshot.</returns>
-        SerializedSnapshot Serialize<TMemento>(Snapshot<TMemento> snapshot)
+        SerializedSnapshot Serialize<TMemento>(in Snapshot<TMemento> snapshot)
             where TMemento : new();
     }
 }

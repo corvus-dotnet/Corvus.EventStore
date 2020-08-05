@@ -17,7 +17,7 @@ namespace Corvus.EventStore.Core
         /// </summary>
         /// <param name="events">The events in the result.</param>
         /// <param name="utf8TextContinuationToken">The continuation token for the result as utf8 text.</param>
-        public EventReaderResult(IEnumerable<SerializedEvent> events, ReadOnlyMemory<byte>? utf8TextContinuationToken)
+        public EventReaderResult(in IEnumerable<SerializedEvent> events, in ReadOnlyMemory<byte>? utf8TextContinuationToken)
         {
             this.ContinuationToken = utf8TextContinuationToken;
             this.Events = events;

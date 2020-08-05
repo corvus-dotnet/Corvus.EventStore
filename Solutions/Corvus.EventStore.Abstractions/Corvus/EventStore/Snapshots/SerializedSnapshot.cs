@@ -25,7 +25,7 @@ namespace Corvus.EventStore.Snapshots
         public SerializedSnapshot(
             string aggregateId,
             long sequenceNumber,
-            ReadOnlyMemory<byte> utf8TextMemento)
+            in ReadOnlyMemory<byte> utf8TextMemento)
         {
             this.AggregateId = aggregateId;
             this.SequenceNumber = sequenceNumber;
@@ -44,7 +44,7 @@ namespace Corvus.EventStore.Snapshots
             bool isEmpty,
             string aggregateId,
             long sequenceNumber,
-            ReadOnlyMemory<byte> utf8TextMemento)
+            in ReadOnlyMemory<byte> utf8TextMemento)
         {
             this.IsEmpty = isEmpty;
             this.AggregateId = aggregateId;

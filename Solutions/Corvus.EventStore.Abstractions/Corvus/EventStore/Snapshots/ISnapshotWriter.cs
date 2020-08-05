@@ -16,6 +16,6 @@ namespace Corvus.EventStore.Snapshots
         /// </summary>
         /// <param name="snapshot">The snapshot to store.</param>
         /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
-        Task WriteAsync(in SerializedSnapshot snapshot);
+        Task WriteAsync(SerializedSnapshot snapshot);
     }
 }

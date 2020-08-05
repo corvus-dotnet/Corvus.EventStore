@@ -25,7 +25,7 @@ namespace Corvus.EventStore.InMemory.Snapshots
         }
 
         /// <inheritdoc/>
-        public Task WriteAsync(in SerializedSnapshot snapshot)
+        public Task WriteAsync(SerializedSnapshot snapshot)
         {
             return this.store.WriteAsync(snapshot);
         }

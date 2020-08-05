@@ -17,13 +17,13 @@ namespace Corvus.EventStore.Core
         /// </summary>
         /// <param name="event">The event to write.</param>
         /// <returns>A task that completes when the events have been written to the store.</returns>
-        Task WriteAsync(in SerializedEvent @event);
+        Task WriteAsync(SerializedEvent @event);
 
         /// <summary>
         /// Performs the supplied list of events to the store as a single transaction.
         /// </summary>
         /// <param name="events">batch set of events write.</param>
         /// <returns>A task that completes when the events have been written to the store.</returns>
-        Task WriteBatchAsync(in IEnumerable<SerializedEvent> events);
+        Task WriteBatchAsync(IEnumerable<SerializedEvent> events);
     }
 }

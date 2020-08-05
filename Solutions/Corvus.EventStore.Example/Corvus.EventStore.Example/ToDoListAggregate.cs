@@ -32,7 +32,7 @@ namespace Corvus.EventStore.Example
         /// <param name="aggregateId">The <see cref="AggregateId"/>.</param>
         /// <param name="uncommittedEvents">The <see cref="uncommittedEvents"/>.</param>
         /// <param name="memento">The <see cref="memento"/>.</param>
-        private ToDoListAggregate(string aggregateId, ImmutableArray<SerializedEvent> uncommittedEvents, ToDoListMemento memento)
+        private ToDoListAggregate(in string aggregateId, in ImmutableArray<SerializedEvent> uncommittedEvents, in ToDoListMemento memento)
         {
             this.AggregateId = aggregateId;
             this.uncommittedEvents = uncommittedEvents;
@@ -58,10 +58,7 @@ namespace Corvus.EventStore.Example
         /// <inheritdoc/>
         public ToDoListAggregate ApplyEvent<TPayload>(in Event<TPayload> @event)
         {
-            if (@event.SequenceNumber != this.SequenceNumber + 1)
-            {
-                throw new ArgumentException($"The event sequence number was incorrect. Expected {this.SequenceNumber + 1}, actual {@event.SequenceNumber}");
-            }
+            this.Validate(@event);
 
             // Update our memento if we want to.
             ToDoListMemento updatedMemento = this.ApplyEventToMemento(@event);
@@ -117,7 +114,7 @@ namespace Corvus.EventStore.Example
             };
         }
 
-        private ToDoListAggregate ApplySerializedEvent(SerializedEvent @event)
+        private ToDoListAggregate ApplySerializedEvent(in SerializedEvent @event)
         {
             return @event.EventType switch
             {
@@ -127,24 +124,32 @@ namespace Corvus.EventStore.Example
             };
         }
 
-        private ToDoListAggregate HandleToDoItemAdded(SerializedEvent @event)
+        private ToDoListAggregate HandleToDoItemAdded(in SerializedEvent @event)
         {
             return this.HandleToDoItemAdded(EventSerializer.Deserialize<ToDoItemAddedEventPayload>(@event));
         }
 
-        private ToDoListAggregate HandleToDoItemRemoved(SerializedEvent @event)
+        private ToDoListAggregate HandleToDoItemRemoved(in SerializedEvent @event)
         {
             return this.HandleToDoItemRemoved(EventSerializer.Deserialize<ToDoItemRemovedEventPayload>(@event));
         }
 
-        private ToDoListAggregate HandleToDoItemAdded(Event<ToDoItemAddedEventPayload> @event)
+        private ToDoListAggregate HandleToDoItemAdded(in Event<ToDoItemAddedEventPayload> @event)
         {
             return new ToDoListAggregate(this.AggregateId, this.uncommittedEvents, this.memento.With(@event.Payload));
         }
 
-        private ToDoListAggregate HandleToDoItemRemoved(Event<ToDoItemRemovedEventPayload> @event)
+        private ToDoListAggregate HandleToDoItemRemoved(in Event<ToDoItemRemovedEventPayload> @event)
         {
             return new ToDoListAggregate(this.AggregateId, this.uncommittedEvents, this.memento.With(@event.Payload));
+        }
+
+        private void Validate<TPayload>(in Event<TPayload> @event)
+        {
+            if (@event.SequenceNumber != this.SequenceNumber + 1)
+            {
+                throw new ArgumentException($"The event sequence number was incorrect. Expected {this.SequenceNumber + 1}, actual {@event.SequenceNumber}");
+            }
         }
     }
 }

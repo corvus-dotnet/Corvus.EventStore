@@ -25,7 +25,7 @@ namespace Corvus.EventStore.Core
             long sequenceNumber,
             long timestamp,
             string partitionKey,
-            TPayload payload)
+            in TPayload payload)
         {
             this.AggregateId = aggregateId;
             this.EventType = eventType;

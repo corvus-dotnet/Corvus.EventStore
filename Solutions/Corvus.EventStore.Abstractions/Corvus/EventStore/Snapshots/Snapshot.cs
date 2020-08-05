@@ -17,7 +17,7 @@ namespace Corvus.EventStore.Snapshots
         /// <param name="aggregateId">The <see cref="AggregateId"/>.</param>
         /// <param name="sequenceNumber">The <see cref="SequenceNumber"/>.</param>
         /// <param name="memento">The <see cref="Memento"/>.</param>
-        public Snapshot(string aggregateId, long sequenceNumber, TMemento memento)
+        public Snapshot(string aggregateId, long sequenceNumber, in TMemento memento)
         {
             this.AggregateId = aggregateId;
             this.SequenceNumber = sequenceNumber;

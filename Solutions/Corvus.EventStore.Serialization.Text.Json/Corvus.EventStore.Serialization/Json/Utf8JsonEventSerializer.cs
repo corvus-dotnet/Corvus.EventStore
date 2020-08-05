@@ -25,7 +25,7 @@ namespace Corvus.EventStore.Serialization.Json
         }
 
         /// <inheritdoc/>
-        public Event<TPayload> Deserialize<TPayload>(SerializedEvent @event)
+        public Event<TPayload> Deserialize<TPayload>(in SerializedEvent @event)
         {
             var reader = new Utf8JsonReader(@event.Payload.Span);
             TPayload payload = JsonSerializer.Deserialize<TPayload>(ref reader, this.options);
@@ -33,7 +33,7 @@ namespace Corvus.EventStore.Serialization.Json
         }
 
         /// <inheritdoc/>
-        public SerializedEvent Serialize<TPayload>(Event<TPayload> @event)
+        public SerializedEvent Serialize<TPayload>(in Event<TPayload> @event)
         {
             byte[] utf8Bytes = JsonSerializer.SerializeToUtf8Bytes(@event.Payload, this.options);
             return new SerializedEvent(

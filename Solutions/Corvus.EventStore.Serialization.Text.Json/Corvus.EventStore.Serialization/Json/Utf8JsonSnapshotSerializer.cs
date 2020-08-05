@@ -24,7 +24,7 @@ namespace Corvus.EventStore.Serialization.Json
         }
 
         /// <inheritdoc/>
-        public Snapshot<TMemento> Deserialize<TMemento>(SerializedSnapshot snapshot)
+        public Snapshot<TMemento> Deserialize<TMemento>(in SerializedSnapshot snapshot)
             where TMemento : new()
         {
             if (snapshot.IsEmpty)
@@ -38,7 +38,7 @@ namespace Corvus.EventStore.Serialization.Json
         }
 
         /// <inheritdoc/>
-        public SerializedSnapshot Serialize<TMemento>(Snapshot<TMemento> snapshot)
+        public SerializedSnapshot Serialize<TMemento>(in Snapshot<TMemento> snapshot)
             where TMemento : new()
         {
             byte[] utf8Bytes = JsonSerializer.SerializeToUtf8Bytes(snapshot.Memento, this.options);
