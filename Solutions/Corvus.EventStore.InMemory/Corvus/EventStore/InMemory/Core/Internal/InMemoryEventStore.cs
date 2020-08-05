@@ -73,7 +73,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         /// </summary>
         /// <param name="eventWrites">The write instructions.</param>
         /// <returns>A task that completes when the events have been written to the store.</returns>
-        public ValueTask WriteBatchAsync(IEnumerable<Action<IEventBatchWriter>> eventWrites)
+        public ValueTask WriteBatchAsync(params Action<IEventBatchWriter>[] eventWrites)
         {
             InMemoryStoreEventBatchWriter batch = default;
 
@@ -84,6 +84,57 @@ namespace Corvus.EventStore.InMemory.Core.Internal
 
             ImmutableArray<InMemoryEvent> events = batch.Events;
 
+            return this.WriteInMemoryEvents(events);
+        }
+
+        /// <summary>
+        /// Writes the supplied events to the store as a single transaction.
+        /// </summary>
+        /// <param name="inMemoryEvents">The <see cref="InMemoryEvent"/>s to write.</param>
+        /// <returns>A task that completes when the events have been written to the store.</returns>
+        public ValueTask WriteAsync(params InMemoryEvent[] inMemoryEvents)
+        {
+            return this.WriteInMemoryEvents(ImmutableArray.Create(inMemoryEvents));
+        }
+
+        /// <summary>
+        /// Writes the supplied event to the store as a single transaction.
+        /// </summary>
+        /// <param name="event">The event to write.</param>
+        /// <returns>A task that completes when the events have been written to the store.</returns>
+        public ValueTask WriteAsync(InMemoryEvent @event)
+        {
+            this.store.AddOrUpdate(
+                @event.AggregateId,
+                seq =>
+                {
+                    if (@event.SequenceNumber != 0)
+                    {
+                        throw new InMemoryEventStoreEventOutOfSequenceException();
+                    }
+
+                    return new InMemoryEventList(0, ImmutableDictionary<long, InMemoryEvent>.Empty.Add(0, @event));
+                },
+                (aggregateId, list) =>
+                {
+                    if (list.LastSequenceNumber >= @event.SequenceNumber)
+                    {
+                        throw new InMemoryEventStoreConcurrencyException();
+                    }
+
+                    if (list.LastSequenceNumber != @event.SequenceNumber - 1)
+                    {
+                        throw new InMemoryEventStoreEventOutOfSequenceException();
+                    }
+
+                    return list.AddEvents(ImmutableArray<InMemoryEvent>.Empty.Add(@event));
+                });
+
+            return new ValueTask(Task.CompletedTask);
+        }
+
+        private ValueTask WriteInMemoryEvents(ImmutableArray<InMemoryEvent> events)
+        {
             if (events.Length == 0)
             {
                 return new ValueTask(Task.CompletedTask);
@@ -128,42 +179,6 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                     }
 
                     return list.AddEvents(events);
-                });
-
-            return new ValueTask(Task.CompletedTask);
-        }
-
-        /// <summary>
-        /// Writes the supplied event to the store as a single transaction.
-        /// </summary>
-        /// <param name="event">The event to write.</param>
-        /// <returns>A task that completes when the events have been written to the store.</returns>
-        public ValueTask WriteAsync(InMemoryEvent @event)
-        {
-            this.store.AddOrUpdate(
-                @event.AggregateId,
-                seq =>
-                {
-                    if (@event.SequenceNumber != 0)
-                    {
-                        throw new InMemoryEventStoreEventOutOfSequenceException();
-                    }
-
-                    return new InMemoryEventList(0, ImmutableDictionary<long, InMemoryEvent>.Empty.Add(0, @event));
-                },
-                (aggregateId, list) =>
-                {
-                    if (list.LastSequenceNumber >= @event.SequenceNumber)
-                    {
-                        throw new InMemoryEventStoreConcurrencyException();
-                    }
-
-                    if (list.LastSequenceNumber != @event.SequenceNumber - 1)
-                    {
-                        throw new InMemoryEventStoreEventOutOfSequenceException();
-                    }
-
-                    return list.AddEvents(ImmutableArray<InMemoryEvent>.Empty.Add(@event));
                 });
 
             return new ValueTask(Task.CompletedTask);
