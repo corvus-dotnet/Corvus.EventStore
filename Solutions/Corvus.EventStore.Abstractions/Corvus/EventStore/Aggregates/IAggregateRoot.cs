@@ -45,7 +45,7 @@ namespace Corvus.EventStore.Aggregates
         /// <remarks>
         /// This will typically be called when the aggregate is being rehydrated from stored events.
         /// </remarks>
-        TAggregate ApplySerializedEvents(IEnumerable<SerializedEvent> events);
+        TAggregate ApplySerializedEvents(in IEnumerable<SerializedEvent> events);
 
         /// <summary>
         /// Stores uncommitted events using the specified event writer.
@@ -53,7 +53,7 @@ namespace Corvus.EventStore.Aggregates
         /// <typeparam name="TEventWriter">The type of event writer to use.</typeparam>
         /// <param name="writer">The event writer to use to store new events.</param>
         /// <returns>The aggregate with all new events committed.</returns>
-        ValueTask<TAggregate> StoreAsync<TEventWriter>(in TEventWriter writer)
+        ValueTask<TAggregate> StoreAsync<TEventWriter>(TEventWriter writer)
             where TEventWriter : IEventWriter;
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace Corvus.EventStore.Aggregates
         /// <typeparam name="TSnapshotWriter">The type of snapshot writer to use.</typeparam>
         /// <param name="writer">The snapshot writer to use to store the new snapshot.</param>
         /// <returns>The aggregate once the new snapshot has been stored.</returns>
-        ValueTask<TAggregate> StoreSnapshotAsync<TSnapshotWriter>(in TSnapshotWriter writer)
+        Task StoreSnapshotAsync<TSnapshotWriter>(TSnapshotWriter writer)
             where TSnapshotWriter : ISnapshotWriter;
     }
 }

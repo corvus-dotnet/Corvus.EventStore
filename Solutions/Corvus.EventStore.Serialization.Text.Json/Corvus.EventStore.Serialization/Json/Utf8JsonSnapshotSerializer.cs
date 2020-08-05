@@ -5,7 +5,6 @@
 namespace Corvus.EventStore.Serialization.Json
 {
     using System.Text.Json;
-    using System.Threading.Tasks;
     using Corvus.EventStore.Snapshots;
 
     /// <summary>
@@ -25,29 +24,28 @@ namespace Corvus.EventStore.Serialization.Json
         }
 
         /// <inheritdoc/>
-        public ValueTask<Snapshot<TMemento>> Deserialize<TMemento>(SerializedSnapshot snapshot)
+        public Snapshot<TMemento> Deserialize<TMemento>(SerializedSnapshot snapshot)
             where TMemento : new()
         {
             if (snapshot.IsEmpty)
             {
-                return new ValueTask<Snapshot<TMemento>>(new Snapshot<TMemento>(snapshot.AggregateId, snapshot.SequenceNumber, new TMemento()));
+                return new Snapshot<TMemento>(snapshot.AggregateId, snapshot.SequenceNumber, new TMemento());
             }
 
             var reader = new Utf8JsonReader(snapshot.Memento.Span);
             TMemento memento = JsonSerializer.Deserialize<TMemento>(ref reader, this.options);
-            return new ValueTask<Snapshot<TMemento>>(new Snapshot<TMemento>(snapshot.AggregateId, snapshot.SequenceNumber, memento));
+            return new Snapshot<TMemento>(snapshot.AggregateId, snapshot.SequenceNumber, memento);
         }
 
         /// <inheritdoc/>
-        public ValueTask<SerializedSnapshot> Serialize<TMemento>(Snapshot<TMemento> snapshot)
+        public SerializedSnapshot Serialize<TMemento>(Snapshot<TMemento> snapshot)
             where TMemento : new()
         {
             byte[] utf8Bytes = JsonSerializer.SerializeToUtf8Bytes(snapshot.Memento, this.options);
-            return new ValueTask<SerializedSnapshot>(
-                new SerializedSnapshot(
-                    snapshot.AggregateId,
-                    snapshot.SequenceNumber,
-                    utf8Bytes));
+            return new SerializedSnapshot(
+                snapshot.AggregateId,
+                snapshot.SequenceNumber,
+                utf8Bytes);
         }
     }
 }

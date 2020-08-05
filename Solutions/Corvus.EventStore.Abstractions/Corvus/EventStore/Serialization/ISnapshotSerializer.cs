@@ -4,7 +4,6 @@
 
 namespace Corvus.EventStore.Serialization
 {
-    using System.Threading.Tasks;
     using Corvus.EventStore.Snapshots;
 
     /// <summary>
@@ -18,7 +17,7 @@ namespace Corvus.EventStore.Serialization
         /// <typeparam name="TMemento">The type of the memento to deserialize.</typeparam>
         /// <param name="snapshot">The snapshot to deserialize.</param>
         /// <returns>The deserialized Snapshot.</returns>
-        ValueTask<Snapshot<TMemento>> Deserialize<TMemento>(SerializedSnapshot snapshot)
+        Snapshot<TMemento> Deserialize<TMemento>(SerializedSnapshot snapshot)
             where TMemento : new();
 
         /// <summary>
@@ -27,7 +26,7 @@ namespace Corvus.EventStore.Serialization
         /// <typeparam name="TMemento">The type of the memento to deserialize.</typeparam>
         /// <param name="snapshot">The Snapshot to serialize.</param>
         /// <returns>A <see cref="SerializedSnapshot"/> representing the given Snapshot.</returns>
-        ValueTask<SerializedSnapshot> Serialize<TMemento>(Snapshot<TMemento> snapshot)
+        SerializedSnapshot Serialize<TMemento>(Snapshot<TMemento> snapshot)
             where TMemento : new();
     }
 }

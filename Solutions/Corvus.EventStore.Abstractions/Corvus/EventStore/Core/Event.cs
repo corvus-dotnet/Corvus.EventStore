@@ -4,8 +4,6 @@
 
 namespace Corvus.EventStore.Core
 {
-    using System;
-
     /// <summary>
     /// Represents an event created by an Aggregate Root that can be stored by an <see cref="IEventWriter"/>.
     /// </summary>

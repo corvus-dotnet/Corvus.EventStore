@@ -52,7 +52,7 @@ namespace Corvus.EventStore.Aggregates
 
             if (snapshotPolicy.ShouldSnapshot(aggregate, timestamp))
             {
-                aggregate = await aggregate.StoreSnapshotAsync(this.snapshotWriter).ConfigureAwait(false);
+                await aggregate.StoreSnapshotAsync(this.snapshotWriter).ConfigureAwait(false);
             }
 
             return aggregate;

@@ -1,20 +1,24 @@
-﻿namespace Corvus.EventStore.Example
+﻿// <copyright file="Program.cs" company="Endjin Limited">
+// Copyright (c) Endjin Limited. All rights reserved.
+// </copyright>
+
+namespace Corvus.EventStore.Example
 {
+    /// <summary>
+    /// Main program.
+    /// </summary>
     public class Program
     {
-        static void Main(string[] args)
+        /// <summary>
+        /// Main entry point.
+        /// </summary>
+        public static void Main()
         {
-            // New up all the things (concrete readers, writers, etc). 
-            var todoListReader = new ToDoListReader();
-            
-
             // Example 1: Retrieve a new instance of an aggregate from the store. Do things to it and save it.
             // Note: We never create an instance of an aggregate with 'new AggregateType()'. We always request them
             // from the store.
 
             // Example 2: Retrieve an instance of an aggregate from the store. Do more things to it and save it again.
-
-
         }
     }
 }

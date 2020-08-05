@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <Import Project="$(EndjinProjectPropsPath)" Condition="$(EndjinProjectPropsPath) != ''" />
 
   <PropertyGroup>
@@ -7,16 +7,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Corvus.Extensions" Version="1.0.0" />
     <PackageReference Include="Endjin.RecommendedPractices" Version="1.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="System.Text.Json" Version="4.7.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Corvus.EventStore.Abstractions\Corvus.EventStore.Abstractions.csproj" />
-    <ProjectReference Include="..\Corvus.EventStore.InMemory\Corvus.EventStore.InMemory.csproj" />
-    <ProjectReference Include="..\Corvus.EventStore.Serialization.Text.Json\Corvus.EventStore.Serialization.Text.Json.csproj" />
   </ItemGroup>
 
 </Project>
