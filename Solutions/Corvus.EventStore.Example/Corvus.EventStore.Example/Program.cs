@@ -75,7 +75,12 @@ namespace Corvus.EventStore.Example
             toDoList2 = toDoList2.AddToDoItem("This is my title", "This is my description");
             toDoList2 = await toDoList2.CommitAsync(writer).ConfigureAwait(false);
 
-            toDoList.ToString();
+            toDoList2.ToString();
+
+            // Example 3: Just get it back again.
+            ToDoList toDoList3 = await ToDoList.Read(reader, aggregateId, partitionKey).ConfigureAwait(false);
+
+            toDoList3.ToString();
         }
     }
 }
