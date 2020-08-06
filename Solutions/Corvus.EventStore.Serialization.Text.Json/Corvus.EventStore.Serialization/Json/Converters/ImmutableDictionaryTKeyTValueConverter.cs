@@ -100,7 +100,7 @@ namespace Corvus.EventStore.Serialization.Json.Converters
 
                     if (this.keyType == typeof(Guid))
                     {
-                        key = CastTo<TKey>.From(reader.GetGuid());
+                        key = CastTo<TKey>.From(Guid.Parse(reader.GetString()));
                     }
                     else
                     {
