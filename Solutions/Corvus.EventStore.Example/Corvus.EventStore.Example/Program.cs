@@ -68,8 +68,6 @@ namespace Corvus.EventStore.Example
             toDoList = await toDoList.CommitAsync(writer).ConfigureAwait(false);
 
             toDoList.ToString();
-
-            // Example 2: Retrieve an instance of an aggregate from the store. Do more things to it and save it again.
         }
     }
 }

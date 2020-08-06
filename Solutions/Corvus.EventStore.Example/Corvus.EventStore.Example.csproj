@@ -25,4 +25,8 @@
     <None Update="../PackageIcon.png" Link="PackageIcon.png" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Internal\" />
+  </ItemGroup>
+
 </Project>

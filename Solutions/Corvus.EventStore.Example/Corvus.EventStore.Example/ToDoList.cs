@@ -7,6 +7,7 @@ namespace Corvus.EventStore.Example
     using System;
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
+    using Corvus.EventStore.Core;
     using Corvus.EventStore.Example.Internal;
 
     /// <summary>
@@ -59,7 +60,13 @@ namespace Corvus.EventStore.Example
         public ToDoList SetOwner(string owner)
         {
             // Then apply an event to set the owner
-            throw new NotImplementedException();
+            return new ToDoList(
+                this.aggregate.ApplyEvent(
+                    new Event<ToDoListOwnerSetEventPayload>(
+                        ToDoListOwnerSetEventPayload.EventType,
+                        this.aggregate.EventSequenceNumber + 1,
+                        DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+                        new ToDoListOwnerSetEventPayload(owner))));
         }
 
         /// <summary>
@@ -70,7 +77,14 @@ namespace Corvus.EventStore.Example
         public ToDoList SetStartDate(DateTimeOffset startDate)
         {
             // Apply an event to set the start date
-            throw new NotImplementedException();
+            // Then apply an event to set the owner
+            return new ToDoList(
+                this.aggregate.ApplyEvent(
+                    new Event<ToDoListStartDateSetEventPayload>(
+                        ToDoListStartDateSetEventPayload.EventType,
+                        this.aggregate.EventSequenceNumber + 1,
+                        DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+                        new ToDoListStartDateSetEventPayload(startDate))));
         }
 
         /// <summary>

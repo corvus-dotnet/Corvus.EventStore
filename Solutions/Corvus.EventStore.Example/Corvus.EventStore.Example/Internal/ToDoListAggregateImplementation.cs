@@ -21,6 +21,8 @@ namespace Corvus.EventStore.Example
             {
                 Event<ToDoItemAddedEventPayload> tdia => memento.With(tdia.Payload),
                 Event<ToDoItemRemovedEventPayload> tdir => memento.With(tdir.Payload),
+                Event<ToDoListOwnerSetEventPayload> tdir => memento.With(tdir.Payload),
+                Event<ToDoListStartDateSetEventPayload> tdir => memento.With(tdir.Payload),
                 _ => throw new InvalidOperationException($"The event type of {@event.EventType} for the event with event sequence number {@event.SequenceNumber} was not recognized."),
             };
         }
@@ -32,6 +34,8 @@ namespace Corvus.EventStore.Example
             {
                 ToDoItemAddedEventPayload.EventType => this.HandleToDoItemAdded(memento, @event),
                 ToDoItemRemovedEventPayload.EventType => this.HandleToDoItemRemoved(memento, @event),
+                ToDoListOwnerSetEventPayload.EventType => this.HandleOwnerSet(memento, @event),
+                ToDoListStartDateSetEventPayload.EventType => this.HandleStartDateSet(memento, @event),
                 _ => throw new InvalidOperationException($"The event with sequence number {@event.SequenceNumber} had event type {@event.EventType} which was not recognized as a valid event type for the ToDoListAggregate."),
             };
         }
@@ -44,6 +48,16 @@ namespace Corvus.EventStore.Example
         private ToDoListMemento HandleToDoItemRemoved(in ToDoListMemento memento, in SerializedEvent @event)
         {
             return memento.With(AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Deserialize<ToDoItemRemovedEventPayload>(@event).Payload);
+        }
+
+        private ToDoListMemento HandleOwnerSet(in ToDoListMemento memento, in SerializedEvent @event)
+        {
+            return memento.With(AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Deserialize<ToDoListOwnerSetEventPayload>(@event).Payload);
+        }
+
+        private ToDoListMemento HandleStartDateSet(in ToDoListMemento memento, in SerializedEvent @event)
+        {
+            return memento.With(AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Deserialize<ToDoListStartDateSetEventPayload>(@event).Payload);
         }
     }
 }
