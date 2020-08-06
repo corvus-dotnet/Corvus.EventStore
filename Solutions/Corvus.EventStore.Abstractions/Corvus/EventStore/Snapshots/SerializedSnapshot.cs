@@ -12,11 +12,6 @@ namespace Corvus.EventStore.Snapshots
     public readonly struct SerializedSnapshot
     {
         /// <summary>
-        /// Gets an empty serialized snapshot.
-        /// </summary>
-        public static readonly SerializedSnapshot Empty = new SerializedSnapshot(true, Guid.Empty, string.Empty, -1, -1, ReadOnlyMemory<byte>.Empty);
-
-        /// <summary>
         /// Initializes a new instance of the <see cref="SerializedSnapshot"/> struct.
         /// </summary>
         /// <param name="aggregateId">The <see cref="AggregateId"/>.</param>
@@ -97,5 +92,13 @@ namespace Corvus.EventStore.Snapshots
         /// Gets the memento data for the snapshot.
         /// </summary>
         public ReadOnlyMemory<byte> Memento { get; }
+
+        /// <summary>
+        /// Gets an empty serialized snapshot.
+        /// </summary>
+        /// <param name="aggregateId">The aggregate ID.</param>
+        /// <param name="partitionKey">The partition key.</param>
+        /// <returns>An empty snapshot for the given aggregate and partition.</returns>
+        public static SerializedSnapshot Empty(Guid aggregateId, string partitionKey) => new SerializedSnapshot(true, aggregateId, partitionKey, -1, -1, ReadOnlyMemory<byte>.Empty);
     }
 }

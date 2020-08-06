@@ -20,6 +20,7 @@ namespace Corvus.EventStore.Aggregates
         /// <param name="aggregateFactory">A factory method for creating an aggregate from a snapshot.</param>
         /// <param name="aggregateId">The Id of the aggregate.</param>
         /// <param name="partitionKey">The partition key of the aggregate.</param>
+        /// <param name="maxItemsPerBatch">The maximum number of items to get per batch.</param>
         /// <param name="sequenceNumber">The maximum sequence number to retrieve.</param>
         /// <returns>The specified aggregate.</returns>
         /// <remarks>
@@ -30,6 +31,7 @@ namespace Corvus.EventStore.Aggregates
             Func<SerializedSnapshot, TAggregate> aggregateFactory,
             Guid aggregateId,
             string partitionKey,
+            int maxItemsPerBatch = 100,
             long sequenceNumber = long.MaxValue)
         where TAggregate : IAggregateRoot<TAggregate>;
     }

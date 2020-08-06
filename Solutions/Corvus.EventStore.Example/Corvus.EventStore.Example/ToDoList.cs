@@ -15,6 +15,9 @@ namespace Corvus.EventStore.Example
     /// </summary>
     public readonly struct ToDoList
     {
+        // We tune this based on our item event size
+        private const int MaxItemsPerBatch = 100;
+
         private readonly AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate;
 
         private ToDoList(AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate)
@@ -34,7 +37,7 @@ namespace Corvus.EventStore.Example
         public static async ValueTask<ToDoList> Read<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue)
             where TReader : IAggregateReader
         {
-            AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Read(reader, aggregateId, partitionKey, commitSequenceNumber).ConfigureAwait(false);
+            AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Read(reader, aggregateId, partitionKey, MaxItemsPerBatch, commitSequenceNumber).ConfigureAwait(false);
             return new ToDoList(aggregate);
         }
 
@@ -85,6 +88,43 @@ namespace Corvus.EventStore.Example
                         this.aggregate.EventSequenceNumber + 1,
                         DateTimeOffset.Now.ToUnixTimeMilliseconds(),
                         new ToDoListStartDateSetEventPayload(startDate))));
+        }
+
+        /// <summary>
+        /// Adds an item to the todo list.
+        /// </summary>
+        /// <param name="title">The title of the item.</param>
+        /// <param name="description">The description of the item.</param>
+        /// <returns>A <see cref="ToDoList"/> with the start date updated.</returns>
+        public ToDoList AddToDoItem(string title, string description)
+        {
+            // Apply an event to add an item
+            // Then apply an event to set the owner
+            return new ToDoList(
+                this.aggregate.ApplyEvent(
+                    new Event<ToDoItemAddedEventPayload>(
+                        ToDoItemAddedEventPayload.EventType,
+                        this.aggregate.EventSequenceNumber + 1,
+                        DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+                        new ToDoItemAddedEventPayload(Guid.NewGuid(), title, description))));
+        }
+
+        /// <summary>
+        /// Removes an item from the todo list.
+        /// </summary>
+        /// <param name="id">The id of the item.</param>
+        /// <returns>A <see cref="ToDoList"/> with the start date updated.</returns>
+        public ToDoList RemoveToDoItem(Guid id)
+        {
+            // Apply an event to add an item
+            // Then apply an event to set the owner
+            return new ToDoList(
+                this.aggregate.ApplyEvent(
+                    new Event<ToDoItemRemovedEventPayload>(
+                        ToDoItemRemovedEventPayload.EventType,
+                        this.aggregate.EventSequenceNumber + 1,
+                        DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+                        new ToDoItemRemovedEventPayload(id))));
         }
 
         /// <summary>

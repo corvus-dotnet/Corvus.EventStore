@@ -37,6 +37,7 @@ namespace Corvus.EventStore.Aggregates
             Func<SerializedSnapshot, TAggregate> aggregateFactory,
             Guid aggregateId,
             string partitionKey,
+            int batchSize = 100,
             long sequenceNumber = long.MaxValue)
             where TAggregate : IAggregateRoot<TAggregate>
         {
@@ -50,7 +51,7 @@ namespace Corvus.EventStore.Aggregates
                     aggregate.PartitionKey,
                     aggregate.CommitSequenceNumber + 1,
                     sequenceNumber,
-                    int.MaxValue).ConfigureAwait(false);
+                    batchSize).ConfigureAwait(false);
 
                 while (true)
                 {

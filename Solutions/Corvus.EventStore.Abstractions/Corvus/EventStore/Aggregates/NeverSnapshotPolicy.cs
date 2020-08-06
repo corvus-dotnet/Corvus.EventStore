@@ -14,7 +14,7 @@ namespace Corvus.EventStore.Aggregates
         /// <summary>
         /// The singleton instance of the policy.
         /// </summary>
-        public static readonly AlwaysSnapshotPolicy<TAggregate> Instance = default;
+        public static readonly NeverSnapshotPolicy<TAggregate> Instance = default;
 
         /// <inheritdoc/>
         public bool ShouldSnapshot(in TAggregate aggregate, long timestamp)

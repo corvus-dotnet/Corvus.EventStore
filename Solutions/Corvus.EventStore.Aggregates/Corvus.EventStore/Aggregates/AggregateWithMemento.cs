@@ -95,26 +95,25 @@ namespace Corvus.EventStore.Aggregates
         /// <param name="reader">The reader from which to read the aggregate.</param>
         /// <param name="aggregateId">The id of the aggregate to read.</param>
         /// <param name="partitionKey">The partition key of the aggregate.</param>
+        /// <param name="maxItemsPerBatch">The optional maximum number of items per batch. The default is 100.</param>
         /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
         /// <returns>A <see cref="ValueTask"/> which completes with the aggregate.</returns>
-        public static ValueTask<AggregateWithMemento<TImplementation, TMemento>> Read<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue)
+        public static ValueTask<AggregateWithMemento<TImplementation, TMemento>> Read<TReader>(TReader reader, Guid aggregateId, string partitionKey, int maxItemsPerBatch = 100, long commitSequenceNumber = long.MaxValue)
             where TReader : IAggregateReader
         {
-            return reader.ReadAsync(s => CreateFrom(aggregateId, partitionKey, s), aggregateId, partitionKey, commitSequenceNumber);
+            return reader.ReadAsync(s => CreateFrom(s), aggregateId, partitionKey, maxItemsPerBatch, commitSequenceNumber);
         }
 
         /// <summary>
         /// Creates an instance of the implementation from a snapshot.
         /// </summary>
-        /// <param name="aggregateId">The id of the aggregate to read.</param>
-        /// <param name="partitionKey">The partition key of the aggregate.</param>
         /// <param name="snapshot">The <see cref="SerializedSnapshot"/> from which to create the state.</param>
         /// <returns>The state with the snapshot applied.</returns>
-        public static AggregateWithMemento<TImplementation, TMemento> CreateFrom(Guid aggregateId, string partitionKey, SerializedSnapshot snapshot)
+        public static AggregateWithMemento<TImplementation, TMemento> CreateFrom(SerializedSnapshot snapshot)
         {
             if (snapshot.IsEmpty)
             {
-                return new AggregateWithMemento<TImplementation, TMemento>(aggregateId, partitionKey, -1, -1, ImmutableArray<SerializedEvent>.Empty, new TMemento());
+                return new AggregateWithMemento<TImplementation, TMemento>(snapshot.AggregateId, snapshot.PartitionKey, -1, -1, ImmutableArray<SerializedEvent>.Empty, new TMemento());
             }
 
             return new AggregateWithMemento<TImplementation, TMemento>(
