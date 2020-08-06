@@ -14,7 +14,7 @@ namespace Corvus.EventStore.Aggregates
     /// </summary>
     /// <typeparam name="TEventReader">The type of the underlying event reader.</typeparam>
     /// <typeparam name="TSnapshotReader">The type of the underlying snapshot reader.</typeparam>
-    public readonly struct AggregateReader<TEventReader, TSnapshotReader>
+    public readonly struct AggregateReader<TEventReader, TSnapshotReader> : IAggregateReader
         where TEventReader : IEventReader
         where TSnapshotReader : ISnapshotReader
     {
@@ -32,18 +32,7 @@ namespace Corvus.EventStore.Aggregates
             this.snapshotReader = snapshotReader;
         }
 
-        /// <summary>
-        /// Reads the aggregate with the specified Id.
-        /// </summary>
-        /// <typeparam name="TAggregate">The type of aggregate being read.</typeparam>
-        /// <param name="aggregateFactory">A factory method for creating an aggregate from a snapshot.</param>
-        /// <param name="aggregateId">The Id of the aggregate.</param>
-        /// <param name="sequenceNumber">The maximum sequence number to retrieve.</param>
-        /// <returns>The specified aggregate.</returns>
-        /// <remarks>
-        /// If a sequence number is supplied, the aggregate will be recreated using events with sequence numbers lower
-        /// than or equal to the specified value.
-        /// </remarks>
+        /// <inheritdoc/>
         public async ValueTask<TAggregate> ReadAsync<TAggregate>(
             Func<SerializedSnapshot, TAggregate> aggregateFactory,
             string aggregateId,

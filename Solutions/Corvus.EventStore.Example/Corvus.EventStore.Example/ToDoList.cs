@@ -1,4 +1,4 @@
-﻿// <copyright file="ToDoListAggregate.cs" company="Endjin Limited">
+﻿// <copyright file="ToDoList.cs" company="Endjin Limited">
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
@@ -15,15 +15,15 @@ namespace Corvus.EventStore.Example
     /// <summary>
     /// The aggregate root for a ToDo list containing ToDo items.
     /// </summary>
-    internal readonly struct ToDoListAggregate : IAggregateImplementationWithMementoHost<ToDoListAggregate, ToDoListMemento>
+    internal readonly struct ToDoList : IAggregateImplementationWithMementoHost<ToDoList, ToDoListMemento>
     {
-        private readonly AggregateImplementationWithMemento<ToDoListAggregate, ToDoListMemento> state;
+        private readonly AggregateImplementationWithMemento<ToDoList, ToDoListMemento> state;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ToDoListAggregate"/> struct.
+        /// Initializes a new instance of the <see cref="ToDoList"/> struct.
         /// </summary>
         /// <param name="state">The current state of the aggregate.</param>
-        private ToDoListAggregate(in AggregateImplementationWithMemento<ToDoListAggregate, ToDoListMemento> state)
+        private ToDoList(in AggregateImplementationWithMemento<ToDoList, ToDoListMemento> state)
         {
             this.state = state;
         }
@@ -40,23 +40,37 @@ namespace Corvus.EventStore.Example
         /// <inheritdoc/>
         public long EventSequenceNumber => this.state.EventSequenceNumber;
 
-        /// <inheritdoc/>
-        public ToDoListAggregate ApplyEvent<TPayload>(in Event<TPayload> @event)
+        /// <summary>
+        /// Reads an instance of an aggregate, optionally to the specified commit sequence number.
+        /// </summary>
+        /// <typeparam name="TReader">The type of the <see cref="IAggregateReader"/>.</typeparam>
+        /// <param name="reader">The reader from which to read the aggregate.</param>
+        /// <param name="aggregateId">The id of the aggregate to read.</param>
+        /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
+        /// <returns>A <see cref="ValueTask"/> which completes with the aggregate.</returns>
+        public static async ValueTask<Aggregate<ToDoList>> Read<TReader>(TReader reader, string aggregateId, long commitSequenceNumber = long.MaxValue)
+            where TReader : IAggregateReader
         {
-            return new ToDoListAggregate(this.state.ApplyEvent(this, @event));
+            return new Aggregate<ToDoList>(await reader.ReadAsync(s => CreateFrom(s), aggregateId, commitSequenceNumber).ConfigureAwait(false));
         }
 
         /// <inheritdoc/>
-        public ToDoListAggregate ApplyCommits(in IEnumerable<Commit> commits)
+        public ToDoList ApplyEvent<TPayload>(in Event<TPayload> @event)
         {
-            return new ToDoListAggregate(this.state.ApplyCommits(this, commits));
+            return new ToDoList(this.state.ApplyEvent(this, @event));
         }
 
         /// <inheritdoc/>
-        public async ValueTask<ToDoListAggregate> CommitAsync<TEventWriter>(TEventWriter writer)
+        public ToDoList ApplyCommits(in IEnumerable<Commit> commits)
+        {
+            return new ToDoList(this.state.ApplyCommits(this, commits));
+        }
+
+        /// <inheritdoc/>
+        public async ValueTask<ToDoList> CommitAsync<TEventWriter>(TEventWriter writer)
             where TEventWriter : IEventWriter
         {
-            return new ToDoListAggregate(await this.state.CommitAsync(writer).ConfigureAwait(false));
+            return new ToDoList(await this.state.CommitAsync(writer).ConfigureAwait(false));
         }
 
         /// <inheritdoc/>
@@ -78,7 +92,7 @@ namespace Corvus.EventStore.Example
         }
 
         /// <inheritdoc/>
-        public AggregateImplementationWithMemento<ToDoListAggregate, ToDoListMemento> ApplySerializedEvent(in AggregateImplementationWithMemento<ToDoListAggregate, ToDoListMemento> implementation, in SerializedEvent @event)
+        public AggregateImplementationWithMemento<ToDoList, ToDoListMemento> ApplySerializedEvent(in AggregateImplementationWithMemento<ToDoList, ToDoListMemento> implementation, in SerializedEvent @event)
         {
             return @event.EventType switch
             {
@@ -88,12 +102,17 @@ namespace Corvus.EventStore.Example
             };
         }
 
-        private AggregateImplementationWithMemento<ToDoListAggregate, ToDoListMemento> HandleToDoItemAdded(in AggregateImplementationWithMemento<ToDoListAggregate, ToDoListMemento> state, in SerializedEvent @event)
+        private static ToDoList CreateFrom(SerializedSnapshot s)
+        {
+            return new ToDoList(AggregateImplementationWithMemento<ToDoList, ToDoListMemento>.CreateFrom(s));
+        }
+
+        private AggregateImplementationWithMemento<ToDoList, ToDoListMemento> HandleToDoItemAdded(in AggregateImplementationWithMemento<ToDoList, ToDoListMemento> state, in SerializedEvent @event)
         {
             return state.UpdateAfterApplyingSerializedEvent(state.Memento.With(state.Deserialize<ToDoItemAddedEventPayload>(@event).Payload));
         }
 
-        private AggregateImplementationWithMemento<ToDoListAggregate, ToDoListMemento> HandleToDoItemRemoved(in AggregateImplementationWithMemento<ToDoListAggregate, ToDoListMemento> state, in SerializedEvent @event)
+        private AggregateImplementationWithMemento<ToDoList, ToDoListMemento> HandleToDoItemRemoved(in AggregateImplementationWithMemento<ToDoList, ToDoListMemento> state, in SerializedEvent @event)
         {
             return state.UpdateAfterApplyingSerializedEvent(state.Memento.With(state.Deserialize<ToDoItemRemovedEventPayload>(@event).Payload));
         }

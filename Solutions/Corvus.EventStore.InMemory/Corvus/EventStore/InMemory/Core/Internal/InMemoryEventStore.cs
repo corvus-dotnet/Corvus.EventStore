@@ -16,6 +16,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
     /// <summary>
     /// Underlying store used by <see cref="InMemoryEventReader"/> and <see cref="InMemoryEventReader"/>.
     /// </summary>
+    /// <remarks>This is the equivalent to "SQL Server" or "Cosmos DB" for other stores - but we've had to implement it ourselves. We could have used a popular in-memory database instead.</remarks>
     public class InMemoryEventStore
     {
         private readonly ConcurrentDictionary<string, CommitList> store =

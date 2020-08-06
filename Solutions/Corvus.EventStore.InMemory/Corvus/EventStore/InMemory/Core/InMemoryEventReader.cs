@@ -26,9 +26,9 @@ namespace Corvus.EventStore.InMemory.Core
         }
 
         /// <inheritdoc/>
-        public ValueTask<EventReaderResult> ReadCommitsAsync(ReadOnlySpan<byte> utf8TextContinuationToken)
+        public ValueTask<EventReaderResult> ReadCommitsAsync(ReadOnlySpan<byte> continuationToken)
         {
-            return this.store.ReadAsync(utf8TextContinuationToken);
+            return this.store.ReadAsync(continuationToken);
         }
 
         /// <inheritdoc/>

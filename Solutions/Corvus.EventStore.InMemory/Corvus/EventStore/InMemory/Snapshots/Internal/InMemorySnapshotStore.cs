@@ -56,7 +56,7 @@ namespace Corvus.EventStore.InMemory.Snapshots.Internal
                 snapshot.AggregateId,
                 seq =>
                 {
-                    return new SnapshotList(ImmutableDictionary<long, SerializedSnapshot>.Empty.Add(localSnapshot.SequenceNumber, localSnapshot));
+                    return new SnapshotList(ImmutableDictionary<long, SerializedSnapshot>.Empty.Add(localSnapshot.CommitSequenceNumber, localSnapshot));
                 },
                 (aggregateId, list) =>
                 {
@@ -77,13 +77,13 @@ namespace Corvus.EventStore.InMemory.Snapshots.Internal
 
             public SnapshotList AddSnapshot(SerializedSnapshot snapshot)
             {
-                if (this.Snapshots.ContainsKey(snapshot.SequenceNumber))
+                if (this.Snapshots.ContainsKey(snapshot.CommitSequenceNumber))
                 {
                     throw new InMemorySnapshotStoreConcurrencyException();
                 }
 
                 return new SnapshotList(
-                    this.Snapshots.Add(snapshot.SequenceNumber, snapshot));
+                    this.Snapshots.Add(snapshot.CommitSequenceNumber, snapshot));
             }
         }
     }

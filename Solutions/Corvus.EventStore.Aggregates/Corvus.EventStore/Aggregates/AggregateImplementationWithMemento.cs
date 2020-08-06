@@ -88,6 +88,22 @@ namespace Corvus.EventStore.Aggregates
         public TMemento Memento { get; }
 
         /// <summary>
+        /// Creates an instance of the implementation from a snapshot.
+        /// </summary>
+        /// <param name="snapshot">The <see cref="SerializedSnapshot"/> from which to create the state.</param>
+        /// <returns>The state with the snapshot applied.</returns>
+        public static AggregateImplementationWithMemento<TAggregate, TMemento> CreateFrom(SerializedSnapshot snapshot)
+        {
+            return new AggregateImplementationWithMemento<TAggregate, TMemento>(
+                snapshot.AggregateId,
+                snapshot.PartitionKey,
+                snapshot.CommitSequenceNumber,
+                snapshot.EventSequenceNumber,
+                ImmutableArray<SerializedEvent>.Empty,
+                SnapshotSerializer.Deserialize<TMemento>(snapshot).Memento);
+        }
+
+        /// <summary>
         /// Deserialize a serialized event.
         /// </summary>
         /// <typeparam name="TPayload">The type of the event payload.</typeparam>
@@ -183,7 +199,7 @@ namespace Corvus.EventStore.Aggregates
         public Task StoreSnapshotAsync<TSnapshotWriter>(TSnapshotWriter writer)
             where TSnapshotWriter : ISnapshotWriter
         {
-            var snapshot = new Snapshot<TMemento>(this.AggregateId, this.CommitSequenceNumber, this.Memento);
+            var snapshot = new Snapshot<TMemento>(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber, this.EventSequenceNumber, this.Memento);
             return writer.WriteAsync(SnapshotSerializer.Serialize(snapshot));
         }
 
