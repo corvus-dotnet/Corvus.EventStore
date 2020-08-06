@@ -22,9 +22,25 @@ namespace Corvus.EventStore.Aggregates
         string AggregateId { get; }
 
         /// <summary>
-        /// Gets the current sequence number for the aggregate.
+        /// Gets the partition key for the aggregate.
         /// </summary>
-        long SequenceNumber { get; }
+        /// <remarks>
+        /// For most implementations, the AggregateId makes a good partition key.
+        /// </remarks>
+        public string PartitionKey { get; }
+
+        /// <summary>
+        /// Gets the sequence number of the current commit for the aggregate.
+        /// </summary>
+        /// <remarks>
+        /// This represents the last commit before any currently uncommitted events were added.
+        /// </remarks>
+        long CommitSequenceNumber { get; }
+
+        /// <summary>
+        /// Gets the sequence number of the latest event in the aggregate, including uncommitted events.
+        /// </summary>
+        long EventSequenceNumber { get; }
 
         /// <summary>
         /// Applies the given event to the aggregate.
@@ -40,12 +56,12 @@ namespace Corvus.EventStore.Aggregates
         /// <summary>
         /// Applies the given events to the aggregate.
         /// </summary>
-        /// <param name="events">The ordered list of events to apply to the aggregate.</param>
+        /// <param name="commits">The ordered list of commits to apply to the aggregate.</param>
         /// <returns>The aggreagte with the events applied.</returns>
         /// <remarks>
         /// This will typically be called when the aggregate is being rehydrated from stored events.
         /// </remarks>
-        TAggregate ApplySerializedEvents(in IEnumerable<SerializedEvent> events);
+        TAggregate ApplyCommits(in IEnumerable<Commit> commits);
 
         /// <summary>
         /// Stores uncommitted events using the specified event writer.
@@ -53,7 +69,7 @@ namespace Corvus.EventStore.Aggregates
         /// <typeparam name="TEventWriter">The type of event writer to use.</typeparam>
         /// <param name="writer">The event writer to use to store new events.</param>
         /// <returns>The aggregate with all new events committed.</returns>
-        ValueTask<TAggregate> StoreAsync<TEventWriter>(TEventWriter writer)
+        ValueTask<TAggregate> CommitAsync<TEventWriter>(TEventWriter writer)
             where TEventWriter : IEventWriter;
 
         /// <summary>

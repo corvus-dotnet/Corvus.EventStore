@@ -14,32 +14,21 @@ namespace Corvus.EventStore.Core
         /// <summary>
         /// Initializes a new instance of the <see cref="SerializedEvent"/> struct.
         /// </summary>
-        /// <param name="aggregateId">The Id of the aggregate to which this event is applied.</param>
         /// <param name="eventType">The <see cref="EventType"/>.</param>
         /// <param name="sequenceNumber">The <see cref="SequenceNumber"/>.</param>
         /// <param name="timestamp">The <see cref="Timestamp"/>.</param>
-        /// <param name="partitionKey">The <see cref="PartitionKey"/>.</param>
         /// <param name="payload">The <see cref="Payload"/>.</param>
         public SerializedEvent(
-            string aggregateId,
             string eventType,
             long sequenceNumber,
             long timestamp,
-            string partitionKey,
             in ReadOnlyMemory<byte> payload)
         {
-            this.AggregateId = aggregateId;
             this.EventType = eventType;
             this.SequenceNumber = sequenceNumber;
             this.Timestamp = timestamp;
-            this.PartitionKey = partitionKey;
             this.Payload = payload;
         }
-
-        /// <summary>
-        /// Gets the Id of the aggregate to which this event is applied.
-        /// </summary>
-        public string AggregateId { get; }
 
         /// <summary>
         /// Gets the unique name for the type of event that this data represents.
@@ -51,13 +40,11 @@ namespace Corvus.EventStore.Core
         public string EventType { get; }
 
         /// <summary>
-        /// Gets the partition key for the event.
-        /// </summary>
-        public string PartitionKey { get; }
-
-        /// <summary>
         /// Gets the nominal wall clock timestamp for the event as determined by the creator of the event.
         /// </summary>
+        /// <remarks>While the timestamp of any event in a single commit will normally be >= that of the preceding event, because any single commit
+        /// occurrs on a single instance, clocks could be reset while the operation is underway, and so you cannot depend on this.
+        /// Sequence numbers determine order, but the timestamp may be useful for diagnostics or reporting.</remarks>
         public long Timestamp { get; }
 
         /// <summary>

@@ -54,24 +54,24 @@ namespace Corvus.EventStore.Aggregates
             SerializedSnapshot serializedSnapshot = await this.snapshotReader.ReadAsync(aggregateId, sequenceNumber).ConfigureAwait(false);
             TAggregate aggregate = aggregateFactory(serializedSnapshot);
 
-            if (aggregate.SequenceNumber < sequenceNumber)
+            if (aggregate.CommitSequenceNumber < sequenceNumber)
             {
-                EventReaderResult newEvents = await this.eventReader.ReadAsync(
+                EventReaderResult newEvents = await this.eventReader.ReadCommitsAsync(
                     aggregate.AggregateId,
-                    aggregate.SequenceNumber + 1,
+                    aggregate.CommitSequenceNumber + 1,
                     sequenceNumber,
                     int.MaxValue).ConfigureAwait(false);
 
                 while (true)
                 {
-                    aggregate = aggregate.ApplySerializedEvents(newEvents.Events);
+                    aggregate = aggregate.ApplyCommits(newEvents.Commits);
 
                     if (newEvents.ContinuationToken is null)
                     {
                         break;
                     }
 
-                    newEvents = await this.eventReader.ReadAsync(newEvents.ContinuationToken.Value.Span).ConfigureAwait(false);
+                    newEvents = await this.eventReader.ReadCommitsAsync(newEvents.ContinuationToken.Value.Span).ConfigureAwait(false);
                 }
             }
 

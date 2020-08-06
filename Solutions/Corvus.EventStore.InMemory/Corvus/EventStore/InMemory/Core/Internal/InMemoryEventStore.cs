@@ -12,50 +12,49 @@ namespace Corvus.EventStore.InMemory.Core.Internal
     using System.Text.Json;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
-    using Corvus.Extensions;
 
     /// <summary>
     /// Underlying store used by <see cref="InMemoryEventReader"/> and <see cref="InMemoryEventReader"/>.
     /// </summary>
     public class InMemoryEventStore
     {
-        private readonly ConcurrentDictionary<string, SerializedEventList> store =
-            new ConcurrentDictionary<string, SerializedEventList>();
+        private readonly ConcurrentDictionary<string, CommitList> store =
+            new ConcurrentDictionary<string, CommitList>();
 
         /// <summary>
         /// Reads events from the store for an aggregate.
         /// </summary>
         /// <param name="aggregateId">The Id of the aggregate to retrieve events for.</param>
-        /// <param name="fromSequenceNumber">The minimum <see cref="Event{T}.SequenceNumber"/> to retrieve.</param>
-        /// <param name="toSequenceNumber">The maximum <see cref="Event{T}.SequenceNumber"/> to retreive.</param>
+        /// <param name="fromSequenceNumber">The minimum <see cref="Commit.SequenceNumber"/> to retrieve.</param>
+        /// <param name="toSequenceNumber">The maximum <see cref="Commit.SequenceNumber"/> to retreive.</param>
         /// <param name="maxItems">The maximum number of items to return.</param>
         /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
-        public ValueTask<EventReaderResult> ReadAsync(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
+        public ValueTask<EventReaderResult> ReadCommitsAsync(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
         {
-            if (!this.store.TryGetValue(aggregateId, out SerializedEventList list))
+            if (!this.store.TryGetValue(aggregateId, out CommitList list))
             {
-                return new ValueTask<EventReaderResult>(new EventReaderResult(Enumerable.Empty<SerializedEvent>(), null));
+                return new ValueTask<EventReaderResult>(new EventReaderResult(Enumerable.Empty<Commit>(), null));
             }
 
-            SerializedEvent[] events = list.Events
+            Commit[] commits = list.Commits
                 .Where(item => item.Key >= fromSequenceNumber && item.Key <= toSequenceNumber)
                 .Take(maxItems)
                 .Select(item => item.Value)
                 .ToArray();
 
-            if (events.Length == maxItems)
+            if (commits.Length == maxItems)
             {
                 var continuationToken = new ContinuationToken(aggregateId, fromSequenceNumber + maxItems, toSequenceNumber, maxItems);
 
                 byte[] encodedContinuationToken = JsonSerializer.SerializeToUtf8Bytes(continuationToken);
-                return new ValueTask<EventReaderResult>(new EventReaderResult(events, encodedContinuationToken));
+                return new ValueTask<EventReaderResult>(new EventReaderResult(commits, encodedContinuationToken));
             }
 
-            return new ValueTask<EventReaderResult>(new EventReaderResult(events, null));
+            return new ValueTask<EventReaderResult>(new EventReaderResult(commits, null));
         }
 
         /// <summary>
-        /// Reads the next block in a result set initially acquired by calling <see cref="ReadAsync(string, long, long, int)"/>.
+        /// Reads the next block in a result set initially acquired by calling <see cref="ReadCommitsAsync(string, long, long, int)"/>.
         /// </summary>
         /// <param name="encodedContinuationToken">A continuation token returned from a previous call that can be used to
         /// obtain the next set of results.</param>
@@ -64,111 +63,40 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         {
             ContinuationToken continuationToken = JsonSerializer.Deserialize<ContinuationToken>(encodedContinuationToken);
 
-            return this.ReadAsync(continuationToken.AggregateId, continuationToken.FromSequenceNumber, continuationToken.ToSequenceNumber, continuationToken.MaxItems);
+            return this.ReadCommitsAsync(continuationToken.AggregateId, continuationToken.FromSequenceNumber, continuationToken.ToSequenceNumber, continuationToken.MaxItems);
         }
 
         /// <summary>
-        /// Writes the supplied events to the store as a single transaction.
+        /// Writes the supplied commit to the store as a single transaction.
         /// </summary>
-        /// <param name="inMemoryEvents">The <see cref="SerializedEvent"/>s to write.</param>
+        /// <param name="commit">The commit to write.</param>
         /// <returns>A task that completes when the events have been written to the store.</returns>
-        public Task WriteAsync(params SerializedEvent[] inMemoryEvents)
-        {
-            return this.WriteSerializedEvents(ImmutableArray<SerializedEvent>.Empty.AddRange(inMemoryEvents));
-        }
-
-        /// <summary>
-        /// Writes the supplied events to the store as a single transaction.
-        /// </summary>
-        /// <param name="inMemoryEvents">The <see cref="SerializedEvent"/>s to write.</param>
-        /// <returns>A task that completes when the events have been written to the store.</returns>
-        public Task WriteAsync(in IEnumerable<SerializedEvent> inMemoryEvents)
-        {
-            return this.WriteSerializedEvents(ImmutableArray<SerializedEvent>.Empty.AddRange(inMemoryEvents));
-        }
-
-        /// <summary>
-        /// Writes the supplied event to the store as a single transaction.
-        /// </summary>
-        /// <param name="event">The event to write.</param>
-        /// <returns>A task that completes when the events have been written to the store.</returns>
-        public Task WriteAsync(SerializedEvent @event)
+        public Task WriteCommitAsync(Commit commit)
         {
             this.store.AddOrUpdate(
-                @event.AggregateId,
+                commit.AggregateId,
                 seq =>
                 {
-                    if (@event.SequenceNumber != 0)
+                    if (commit.SequenceNumber != 0)
                     {
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return new SerializedEventList(0, ImmutableDictionary<long, SerializedEvent>.Empty.Add(0, @event));
+                    return new CommitList(0, ImmutableDictionary<long, Commit>.Empty.Add(0, commit));
                 },
                 (aggregateId, list) =>
                 {
-                    if (list.LastSequenceNumber >= @event.SequenceNumber)
+                    if (list.LastCommitSequenceNumber >= commit.SequenceNumber)
                     {
                         throw new InMemoryEventStoreConcurrencyException();
                     }
 
-                    if (list.LastSequenceNumber != @event.SequenceNumber - 1)
+                    if (list.LastCommitSequenceNumber != commit.SequenceNumber - 1)
                     {
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return list.AddEvents(ImmutableArray<SerializedEvent>.Empty.Add(@event));
-                });
-
-            return Task.CompletedTask;
-        }
-
-        private Task WriteSerializedEvents(ImmutableArray<SerializedEvent> events)
-        {
-            if (events.Length == 0)
-            {
-                return Task.CompletedTask;
-            }
-
-            string aggregateId = events[0].AggregateId;
-
-            events.ForEachAtIndex((ev, idx) =>
-            {
-                if (ev.AggregateId != aggregateId)
-                {
-                    throw new ArgumentException("All supplied events must have the same aggregate Id.", nameof(events));
-                }
-
-                if (idx > 0 && ev.SequenceNumber != events[idx - 1].SequenceNumber + 1)
-                {
-                    throw new ArgumentException("Event sequence numbers must be consecutive.", nameof(events));
-                }
-            });
-
-            this.store.AddOrUpdate(
-                aggregateId,
-                seq =>
-                {
-                    if (events[0].SequenceNumber != 0)
-                    {
-                        throw new InMemoryEventStoreEventOutOfSequenceException();
-                    }
-
-                    return new SerializedEventList(0, ImmutableDictionary<long, SerializedEvent>.Empty.AddRange(events.Select(ev => KeyValuePair.Create(ev.SequenceNumber, ev))));
-                },
-                (aggregateId, list) =>
-                {
-                    if (list.LastSequenceNumber >= events[0].SequenceNumber)
-                    {
-                        throw new InMemoryEventStoreConcurrencyException();
-                    }
-
-                    if (list.LastSequenceNumber != events[0].SequenceNumber - 1)
-                    {
-                        throw new InMemoryEventStoreEventOutOfSequenceException();
-                    }
-
-                    return list.AddEvents(events);
+                    return list.AddCommits(ImmutableArray<Commit>.Empty.Add(commit));
                 });
 
             return Task.CompletedTask;
@@ -193,23 +121,23 @@ namespace Corvus.EventStore.InMemory.Core.Internal
             public string AggregateId { get; }
         }
 
-        private readonly struct SerializedEventList
+        private readonly struct CommitList
         {
-            public SerializedEventList(long eTag, ImmutableDictionary<long, SerializedEvent> events)
+            public CommitList(long lastCommitSequenceNumber, ImmutableDictionary<long, Commit> commits)
             {
-                this.Events = events;
-                this.LastSequenceNumber = eTag;
+                this.Commits = commits;
+                this.LastCommitSequenceNumber = lastCommitSequenceNumber;
             }
 
-            public long LastSequenceNumber { get; }
+            public long LastCommitSequenceNumber { get; }
 
-            public ImmutableDictionary<long, SerializedEvent> Events { get; }
+            public ImmutableDictionary<long, Commit> Commits { get; }
 
-            public SerializedEventList AddEvents(ImmutableArray<SerializedEvent> events)
+            public CommitList AddCommits(ImmutableArray<Commit> commits)
             {
-                return new SerializedEventList(
-                    this.LastSequenceNumber + 1,
-                    this.Events.AddRange(events.Select(ev => KeyValuePair.Create(ev.SequenceNumber, ev))));
+                return new CommitList(
+                    this.LastCommitSequenceNumber + 1,
+                    this.Commits.AddRange(commits.Select(commit => KeyValuePair.Create(commit.SequenceNumber, commit))));
             }
         }
     }

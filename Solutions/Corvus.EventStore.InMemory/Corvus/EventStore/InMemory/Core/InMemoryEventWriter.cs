@@ -4,7 +4,6 @@
 
 namespace Corvus.EventStore.InMemory.Core
 {
-    using System.Collections.Generic;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
     using Corvus.EventStore.InMemory.Core.Internal;
@@ -26,15 +25,10 @@ namespace Corvus.EventStore.InMemory.Core
         }
 
         /// <inheritdoc/>
-        public Task WriteAsync(SerializedEvent @event)
+        public Task WriteCommitAsync(Commit commit)
         {
-            return this.store.WriteAsync(@event);
-        }
-
-        /// <inheritdoc/>
-        public Task WriteBatchAsync(IEnumerable<SerializedEvent> events)
-        {
-            return this.store.WriteAsync(events);
+            // TODO: Catch store-specific exception and turn it into an IEventWriter concurrency exception/failure.
+            return this.store.WriteCommitAsync(commit);
         }
     }
 }

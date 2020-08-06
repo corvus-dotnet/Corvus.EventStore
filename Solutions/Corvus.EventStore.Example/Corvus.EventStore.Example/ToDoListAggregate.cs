@@ -30,13 +30,17 @@ namespace Corvus.EventStore.Example
         /// Initializes a new instance of the <see cref="ToDoListAggregate"/> struct.
         /// </summary>
         /// <param name="aggregateId">The <see cref="AggregateId"/>.</param>
-        /// <param name="sequenceNumber">The <see cref="SequenceNumber"/>.</param>
+        /// <param name="partitionKey">The <see cref="PartitionKey"/>.</param>
+        /// <param name="commitSequenceNumber">The <see cref="CommitSequenceNumber"/>.</param>
+        /// <param name="eventSequenceNumber">The <see cref="EventSequenceNumber"/>.</param>
         /// <param name="uncommittedEvents">The <see cref="uncommittedEvents"/>.</param>
         /// <param name="memento">The <see cref="memento"/>.</param>
-        private ToDoListAggregate(string aggregateId, long sequenceNumber, in ImmutableArray<SerializedEvent> uncommittedEvents, in ToDoListMemento memento)
+        private ToDoListAggregate(string aggregateId, string partitionKey, long commitSequenceNumber, long eventSequenceNumber, in ImmutableArray<SerializedEvent> uncommittedEvents, in ToDoListMemento memento)
         {
             this.AggregateId = aggregateId;
-            this.SequenceNumber = sequenceNumber;
+            this.PartitionKey = partitionKey;
+            this.CommitSequenceNumber = commitSequenceNumber;
+            this.EventSequenceNumber = eventSequenceNumber;
             this.uncommittedEvents = uncommittedEvents;
             this.memento = memento;
         }
@@ -55,7 +59,13 @@ namespace Corvus.EventStore.Example
         public string AggregateId { get; }
 
         /// <inheritdoc/>
-        public long SequenceNumber { get; }
+        public string PartitionKey { get; }
+
+        /// <inheritdoc/>
+        public long CommitSequenceNumber { get; }
+
+        /// <inheritdoc/>
+        public long EventSequenceNumber { get; }
 
         /// <inheritdoc/>
         public ToDoListAggregate ApplyEvent<TPayload>(in Event<TPayload> @event)
@@ -67,26 +77,29 @@ namespace Corvus.EventStore.Example
 
             // Add our uncommitted event
             SerializedEvent serializedEvent = EventSerializer.Serialize(@event);
-            return new ToDoListAggregate(this.AggregateId, this.SequenceNumber + 1, this.uncommittedEvents.Add(serializedEvent), updatedMemento);
+            return new ToDoListAggregate(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber, this.EventSequenceNumber + 1, this.uncommittedEvents.Add(serializedEvent), updatedMemento);
         }
 
         /// <inheritdoc/>
-        public ToDoListAggregate ApplySerializedEvents(in IEnumerable<SerializedEvent> events)
+        public ToDoListAggregate ApplyCommits(in IEnumerable<Commit> commits)
         {
-            events.ValidateEvents(this.AggregateId, this.SequenceNumber);
+            commits.ValidateCommits(this.AggregateId, this.CommitSequenceNumber, this.EventSequenceNumber);
 
             ToDoListAggregate aggregate = this;
 
-            foreach (SerializedEvent @event in events)
+            foreach (Commit commit in commits)
             {
-                aggregate = aggregate.ApplySerializedEvent(@event);
+                foreach (SerializedEvent @event in commit.Events)
+                {
+                    aggregate = aggregate.ApplySerializedEvent(@event);
+                }
             }
 
             return aggregate;
         }
 
         /// <inheritdoc/>
-        public async ValueTask<ToDoListAggregate> StoreAsync<TEventWriter>(TEventWriter writer)
+        public async ValueTask<ToDoListAggregate> CommitAsync<TEventWriter>(TEventWriter writer)
             where TEventWriter : IEventWriter
         {
             if (this.uncommittedEvents.Length == 0)
@@ -94,15 +107,15 @@ namespace Corvus.EventStore.Example
                 return this;
             }
 
-            await writer.WriteBatchAsync(this.uncommittedEvents).ConfigureAwait(false);
-            return new ToDoListAggregate(this.AggregateId, this.SequenceNumber, ImmutableArray<SerializedEvent>.Empty, this.memento);
+            await writer.WriteCommitAsync(new Commit(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber + 1, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), this.uncommittedEvents)).ConfigureAwait(false);
+            return new ToDoListAggregate(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber + 1, this.EventSequenceNumber, ImmutableArray<SerializedEvent>.Empty, this.memento);
         }
 
         /// <inheritdoc/>
         public Task StoreSnapshotAsync<TSnapshotWriter>(TSnapshotWriter writer)
             where TSnapshotWriter : ISnapshotWriter
         {
-            var snapshot = new Snapshot<ToDoListMemento>(this.AggregateId, this.SequenceNumber, this.memento);
+            var snapshot = new Snapshot<ToDoListMemento>(this.AggregateId, this.CommitSequenceNumber, this.memento);
             return writer.WriteAsync(SnapshotSerializer.Serialize(snapshot));
         }
 
@@ -112,7 +125,7 @@ namespace Corvus.EventStore.Example
             {
                 Event<ToDoItemAddedEventPayload> tdia => this.memento.With(tdia.Payload),
                 Event<ToDoItemRemovedEventPayload> tdir => this.memento.With(tdir.Payload),
-                _ => throw new InvalidOperationException($"The event type of {@event.EventType} for the event for the aggregate with ID {@event.AggregateId} with sequence number {@event.SequenceNumber} was not recognized."),
+                _ => throw new InvalidOperationException($"The event type of {@event.EventType} for the event for the aggregate with ID {this.AggregateId} with event sequence number {@event.SequenceNumber} was not recognized."),
             };
         }
 
@@ -138,19 +151,19 @@ namespace Corvus.EventStore.Example
 
         private ToDoListAggregate HandleToDoItemAdded(in Event<ToDoItemAddedEventPayload> @event)
         {
-            return new ToDoListAggregate(this.AggregateId, this.SequenceNumber + 1, this.uncommittedEvents, this.memento.With(@event.Payload));
+            return new ToDoListAggregate(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber, this.EventSequenceNumber + 1, this.uncommittedEvents, this.memento.With(@event.Payload));
         }
 
         private ToDoListAggregate HandleToDoItemRemoved(in Event<ToDoItemRemovedEventPayload> @event)
         {
-            return new ToDoListAggregate(this.AggregateId, this.SequenceNumber + 1, this.uncommittedEvents, this.memento.With(@event.Payload));
+            return new ToDoListAggregate(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber, this.EventSequenceNumber + 1, this.uncommittedEvents, this.memento.With(@event.Payload));
         }
 
         private void Validate<TPayload>(in Event<TPayload> @event)
         {
-            if (@event.SequenceNumber != this.SequenceNumber + 1)
+            if (@event.SequenceNumber != this.EventSequenceNumber + 1)
             {
-                throw new ArgumentException($"The event sequence number was incorrect. Expected {this.SequenceNumber + 1}, actual {@event.SequenceNumber}");
+                throw new ArgumentException($"The event sequence number was incorrect. Expected {this.EventSequenceNumber + 1}, actual {@event.SequenceNumber}");
             }
         }
     }

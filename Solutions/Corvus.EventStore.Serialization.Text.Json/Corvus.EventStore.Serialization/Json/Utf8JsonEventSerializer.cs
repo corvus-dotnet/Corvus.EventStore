@@ -29,7 +29,7 @@ namespace Corvus.EventStore.Serialization.Json
         {
             var reader = new Utf8JsonReader(@event.Payload.Span);
             TPayload payload = JsonSerializer.Deserialize<TPayload>(ref reader, this.options);
-            return new Event<TPayload>(@event.AggregateId, @event.EventType, @event.SequenceNumber, @event.Timestamp, @event.PartitionKey, payload);
+            return new Event<TPayload>(@event.EventType, @event.SequenceNumber, @event.Timestamp, payload);
         }
 
         /// <inheritdoc/>
@@ -37,11 +37,9 @@ namespace Corvus.EventStore.Serialization.Json
         {
             byte[] utf8Bytes = JsonSerializer.SerializeToUtf8Bytes(@event.Payload, this.options);
             return new SerializedEvent(
-                @event.AggregateId,
                 @event.EventType,
                 @event.SequenceNumber,
                 @event.Timestamp,
-                @event.PartitionKey,
                 utf8Bytes);
         }
     }

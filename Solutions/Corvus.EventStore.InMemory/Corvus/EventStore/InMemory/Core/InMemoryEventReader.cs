@@ -26,15 +26,15 @@ namespace Corvus.EventStore.InMemory.Core
         }
 
         /// <inheritdoc/>
-        public ValueTask<EventReaderResult> ReadAsync(ReadOnlySpan<byte> utf8TextContinuationToken)
+        public ValueTask<EventReaderResult> ReadCommitsAsync(ReadOnlySpan<byte> utf8TextContinuationToken)
         {
             return this.store.ReadAsync(utf8TextContinuationToken);
         }
 
         /// <inheritdoc/>
-        public ValueTask<EventReaderResult> ReadAsync(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
+        public ValueTask<EventReaderResult> ReadCommitsAsync(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
         {
-            return this.store.ReadAsync(aggregateId, fromSequenceNumber, toSequenceNumber, maxItems);
+            return this.store.ReadCommitsAsync(aggregateId, fromSequenceNumber, toSequenceNumber, maxItems);
         }
     }
 }

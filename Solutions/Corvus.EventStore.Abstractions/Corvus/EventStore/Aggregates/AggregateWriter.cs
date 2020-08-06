@@ -48,7 +48,7 @@ namespace Corvus.EventStore.Aggregates
             where TAggregate : IAggregateRoot<TAggregate>
             where TSnapshotPolicy : struct, IAggregateWriterSnapshotPolicy<TAggregate>
         {
-            aggregate = await aggregate.StoreAsync(this.eventWriter).ConfigureAwait(false);
+            aggregate = await aggregate.CommitAsync(this.eventWriter).ConfigureAwait(false);
 
             if (snapshotPolicy.ShouldSnapshot(aggregate, timestamp))
             {

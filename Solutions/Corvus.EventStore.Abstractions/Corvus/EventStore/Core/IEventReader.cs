@@ -13,25 +13,25 @@ namespace Corvus.EventStore.Core
     public interface IEventReader
     {
         /// <summary>
-        /// Reads events from the store for an aggregate.
+        /// Read committed events from the store for an aggregate.
         /// </summary>
-        /// <param name="aggregateId">The Id of the aggregate to retrieve events for.</param>
+        /// <param name="aggregateId">The Id of the aggregate to retrieve commited events for.</param>
         /// <param name="fromSequenceNumber">The minimum <see cref="Event{T}.SequenceNumber"/> to retrieve.</param>
         /// <param name="toSequenceNumber">The maximum <see cref="Event{T}.SequenceNumber"/> to retreive.</param>
         /// <param name="maxItems">The maximum number of items to return.</param>
         /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
-        ValueTask<EventReaderResult> ReadAsync(
+        ValueTask<EventReaderResult> ReadCommitsAsync(
             string aggregateId,
             long fromSequenceNumber,
             long toSequenceNumber,
             int maxItems);
 
         /// <summary>
-        /// Reads the next block in a result set initially acquired by calling <see cref="ReadAsync(string, long, long, int)"/>.
+        /// Reads the next block in a result set initially acquired by calling <see cref="ReadCommitsAsync(string, long, long, int)"/>.
         /// </summary>
         /// <param name="continuationToken">A continuation token returned from a previous call that can be used to
         /// obtain the next set of results.</param>
         /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
-        ValueTask<EventReaderResult> ReadAsync(ReadOnlySpan<byte> continuationToken);
+        ValueTask<EventReaderResult> ReadCommitsAsync(ReadOnlySpan<byte> continuationToken);
     }
 }

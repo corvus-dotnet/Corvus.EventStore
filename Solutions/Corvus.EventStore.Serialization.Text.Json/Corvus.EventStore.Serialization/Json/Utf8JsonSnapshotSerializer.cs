@@ -44,7 +44,7 @@ namespace Corvus.EventStore.Serialization.Json
             byte[] utf8Bytes = JsonSerializer.SerializeToUtf8Bytes(snapshot.Memento, this.options);
             return new SerializedSnapshot(
                 snapshot.AggregateId,
-                snapshot.SequenceNumber,
+                snapshot.CommitSequenceNumber,
                 utf8Bytes);
         }
     }

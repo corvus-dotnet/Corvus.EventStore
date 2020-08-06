@@ -8,19 +8,19 @@ namespace Corvus.EventStore.Core
     using System.Collections.Generic;
 
     /// <summary>
-    /// A result set from a call to <see cref="IEventReader.ReadAsync(string, long, long, int)"/>.
+    /// A result set from a call to <see cref="IEventReader.ReadCommitsAsync(string, long, long, int)"/>.
     /// </summary>
     public readonly struct EventReaderResult
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="EventReaderResult"/> struct.
         /// </summary>
-        /// <param name="events">The events in the result.</param>
-        /// <param name="utf8TextContinuationToken">The continuation token for the result as utf8 text.</param>
-        public EventReaderResult(in IEnumerable<SerializedEvent> events, in ReadOnlyMemory<byte>? utf8TextContinuationToken)
+        /// <param name="commits">The commits in the result.</param>
+        /// <param name="continuationToken">The continuation token for the result.</param>
+        public EventReaderResult(in IEnumerable<Commit> commits, in ReadOnlyMemory<byte>? continuationToken)
         {
-            this.ContinuationToken = utf8TextContinuationToken;
-            this.Events = events;
+            this.ContinuationToken = continuationToken;
+            this.Commits = commits;
         }
 
         /// <summary>
@@ -31,6 +31,6 @@ namespace Corvus.EventStore.Core
         /// <summary>
         /// Gets the list of returned events.
         /// </summary>
-        public IEnumerable<SerializedEvent> Events { get; }
+        public IEnumerable<Commit> Commits { get; }
     }
 }

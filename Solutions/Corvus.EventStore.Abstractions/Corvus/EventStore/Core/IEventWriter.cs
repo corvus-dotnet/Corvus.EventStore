@@ -4,7 +4,6 @@
 
 namespace Corvus.EventStore.Core
 {
-    using System.Collections.Generic;
     using System.Threading.Tasks;
 
     /// <summary>
@@ -13,17 +12,10 @@ namespace Corvus.EventStore.Core
     public interface IEventWriter
     {
         /// <summary>
-        /// Writes the supplied event to the store as a single transaction.
-        /// </summary>
-        /// <param name="event">The event to write.</param>
-        /// <returns>A task that completes when the events have been written to the store.</returns>
-        Task WriteAsync(SerializedEvent @event);
-
-        /// <summary>
         /// Performs the supplied list of events to the store as a single transaction.
         /// </summary>
-        /// <param name="events">batch set of events write.</param>
+        /// <param name="commit">The batch of events to commit.</param>
         /// <returns>A task that completes when the events have been written to the store.</returns>
-        Task WriteBatchAsync(IEnumerable<SerializedEvent> events);
+        Task WriteCommitAsync(Commit commit);
     }
 }
