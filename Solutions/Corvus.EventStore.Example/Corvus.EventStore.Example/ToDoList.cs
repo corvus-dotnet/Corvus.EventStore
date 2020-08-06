@@ -46,8 +46,8 @@ namespace Corvus.EventStore.Example
         {
             // Apply an event to set the start date
             // Then apply an event to set the owner
-                return this.SetStartDate(startDate)
-                           .SetOwner(owner);
+            return this.SetStartDate(startDate)
+                       .SetOwner(owner);
         }
 
         /// <summary>
@@ -81,6 +81,7 @@ namespace Corvus.EventStore.Example
         public async ValueTask<ToDoList> CommitAsync<TWriter>(TWriter writer)
             where TWriter : IAggregateWriter
         {
+            // Note that we have a policy here that says "never create snapshots".
             return new ToDoList(
                 await writer.WriteAsync(
                     this.aggregate,

@@ -24,20 +24,32 @@ namespace Corvus.EventStore.Example
         /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
         public static async Task Main()
         {
-            // Example 1: Retrieve a new instance of an aggregate from the store. Do things to it and commit it.
-            // Note: We never create an instance of an aggregate with 'new AggregateType()'. We always request them
-            // from the store.
-
             // Configure the database (in this case a hand-rolled "in memory event store" database. But could be e.g. SQL, Cosmos, Table Storage
+            // This would typically be done while you are setting up the container
             var inMemoryEventStore = new InMemoryEventStore();
             var inMemorySnapshotStore = new InMemorySnapshotStore();
 
+            // Example 1: Retrieve a new instance of an aggregate from the store. This type of aggregate is implemented over its own in-memory memento.
+            // We Do things to it and commit it.
+
+            // This is the ID of our aggregate - imagine this came in from the request, for example.
+            var aggregateId = Guid.Parse("2c46ed1c-474e-4c94-ac44-0570a46ceb30");
+
             // Create an aggregate reader for the configured store. This is cheap and can be done every time. It is stateless.
+            // You would typically get this as a transient from the container. But as you can see you can just new everything up, too.
+            // This happens to use an in memory reader for both the events and the snapshots, but you could (and frequently would) configure the AggregateReader with
+            // different readers for events and snapshots so that they can go to different stores.
             AggregateReader<InMemoryEventReader, InMemorySnapshotReader> reader =
                 InMemoryAggregateReader.GetInstance(inMemoryEventStore, inMemorySnapshotStore);
 
-            // Read a todolist from the store.
-            ToDoList toDoList = await ToDoList.Read(reader, Guid.Parse("2c46ed1c-474e-4c94-ac44-0570a46ceb30")).ConfigureAwait(false);
+            // Read a todolist from the store. This type uses an aggregate in its implementation, and provides
+            // a nice domain-specific facade over it.
+            // Note: We never create an instance of an aggregate with 'new AggregateType()'. We always request them
+            // from the store. Aggregates will typically have private constructors.
+            // While you can hand-roll your own aggregates from scratch, it is usually better to use one of the precanned
+            // implementation patterns, of which we have provided one in this demo (one that is implemented over an internal
+            // memento which it uses to produce its snapshots).
+            ToDoList toDoList = await ToDoList.Read(reader, aggregateId).ConfigureAwait(false);
 
             string currentUser = "Bill Gates";
 
