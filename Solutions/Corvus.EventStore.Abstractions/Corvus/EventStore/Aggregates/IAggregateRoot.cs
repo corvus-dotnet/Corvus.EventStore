@@ -4,6 +4,7 @@
 
 namespace Corvus.EventStore.Aggregates
 {
+    using System;
     using System.Collections.Generic;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
@@ -19,7 +20,7 @@ namespace Corvus.EventStore.Aggregates
         /// <summary>
         /// Gets the unique Id for the aggregate.
         /// </summary>
-        string AggregateId { get; }
+        Guid AggregateId { get; }
 
         /// <summary>
         /// Gets the partition key for the aggregate.

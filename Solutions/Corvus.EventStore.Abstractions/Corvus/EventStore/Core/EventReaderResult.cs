@@ -8,7 +8,7 @@ namespace Corvus.EventStore.Core
     using System.Collections.Generic;
 
     /// <summary>
-    /// A result set from a call to <see cref="IEventReader.ReadCommitsAsync(string, long, long, int)"/>.
+    /// A result set from a call to <see cref="IEventReader.ReadCommitsAsync(Guid, long, long, int)"/>.
     /// </summary>
     public readonly struct EventReaderResult
     {

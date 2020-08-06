@@ -14,7 +14,7 @@ namespace Corvus.EventStore.Snapshots
         /// <summary>
         /// Gets an empty serialized snapshot.
         /// </summary>
-        public static readonly SerializedSnapshot Empty = new SerializedSnapshot(true, string.Empty, string.Empty, -1, -1, ReadOnlyMemory<byte>.Empty);
+        public static readonly SerializedSnapshot Empty = new SerializedSnapshot(true, Guid.Empty, string.Empty, -1, -1, ReadOnlyMemory<byte>.Empty);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SerializedSnapshot"/> struct.
@@ -25,7 +25,7 @@ namespace Corvus.EventStore.Snapshots
         /// <param name="eventSequenceNumber">The <see cref="EventSequenceNumber"/>.</param>
         /// <param name="utf8TextMemento">The <see cref="Memento"/>.</param>
         public SerializedSnapshot(
-            string aggregateId,
+            Guid aggregateId,
             string partitionKey,
             long commitSequenceNumber,
             long eventSequenceNumber,
@@ -50,7 +50,7 @@ namespace Corvus.EventStore.Snapshots
         /// <param name="memento">The <see cref="Memento"/>.</param>
         public SerializedSnapshot(
             bool isEmpty,
-            string aggregateId,
+            Guid aggregateId,
             string partitionKey,
             long commitSequenceNumber,
             long eventSequenceNumber,
@@ -68,7 +68,7 @@ namespace Corvus.EventStore.Snapshots
         /// <summary>
         /// Gets the Id of the aggregate to which this snapshot is applied.
         /// </summary>
-        public string AggregateId { get; }
+        public Guid AggregateId { get; }
 
         /// <summary>
         /// Gets the partitionkey of the aggregate to which this snapshot is applied.

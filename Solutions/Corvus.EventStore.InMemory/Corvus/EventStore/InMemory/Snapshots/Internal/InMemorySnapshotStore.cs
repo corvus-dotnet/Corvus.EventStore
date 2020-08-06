@@ -4,6 +4,7 @@
 
 namespace Corvus.EventStore.InMemory.Snapshots.Internal
 {
+    using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Collections.Immutable;
@@ -16,8 +17,8 @@ namespace Corvus.EventStore.InMemory.Snapshots.Internal
     /// </summary>
     public class InMemorySnapshotStore
     {
-        private readonly ConcurrentDictionary<string, SnapshotList> store =
-            new ConcurrentDictionary<string, SnapshotList>();
+        private readonly ConcurrentDictionary<Guid, SnapshotList> store =
+            new ConcurrentDictionary<Guid, SnapshotList>();
 
         /// <summary>
         /// Reads the specified snapshot for the given aggregate.
@@ -26,7 +27,7 @@ namespace Corvus.EventStore.InMemory.Snapshots.Internal
         /// <param name="atSequenceId">The sequence Id to read the snapshot at. The snapshot returned will be the one with the highest sequence number less than or equal to this value.</param>
         /// <returns>The most recent snapshot for the aggregate. If no snapshot exists, a new snapshot will be returned containing a payload created via the defaultPayloadFactory.</returns>
         public ValueTask<SerializedSnapshot> ReadAsync(
-            string aggregateId,
+            Guid aggregateId,
             long atSequenceId = long.MaxValue)
         {
             if (!this.store.TryGetValue(aggregateId, out SnapshotList list))

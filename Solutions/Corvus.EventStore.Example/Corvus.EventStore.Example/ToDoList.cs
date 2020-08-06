@@ -5,18 +5,18 @@
 namespace Corvus.EventStore.Example
 {
     using System;
-    using System.IO;
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
+    using Corvus.EventStore.Example.Internal;
 
     /// <summary>
     /// A to do list backed by an aggregate root.
     /// </summary>
     public readonly struct ToDoList
     {
-        private readonly ToDoListAggregate aggregate;
+        private readonly AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate;
 
-        private ToDoList(ToDoListAggregate aggregate)
+        private ToDoList(AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate)
         {
             this.aggregate = aggregate;
         }
@@ -29,10 +29,10 @@ namespace Corvus.EventStore.Example
         /// <param name="aggregateId">The id of the aggregate to read.</param>
         /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
         /// <returns>A <see cref="ValueTask"/> which completes with the to do list.</returns>
-        public static async ValueTask<ToDoList> Read<TReader>(TReader reader, string aggregateId, long commitSequenceNumber = long.MaxValue)
+        public static async ValueTask<ToDoList> Read<TReader>(TReader reader, Guid aggregateId, long commitSequenceNumber = long.MaxValue)
             where TReader : IAggregateReader
         {
-            ToDoListAggregate aggregate = await ToDoListAggregate.Read(reader, aggregateId, commitSequenceNumber).ConfigureAwait(false);
+            AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Read(reader, aggregateId, commitSequenceNumber).ConfigureAwait(false);
             return new ToDoList(aggregate);
         }
 
@@ -41,7 +41,7 @@ namespace Corvus.EventStore.Example
         /// </summary>
         /// <param name="startDate">The starting date for items in the ToDo list.</param>
         /// <param name="owner">The owner of the ToDo list.</param>
-        /// <returns>The updated todo list.</returns>
+        /// <returns>The updated <see cref="ToDoList"/>.</returns>
         public ToDoList Initialize(DateTimeOffset startDate, string owner)
         {
             // Apply an event to set the start date
@@ -50,12 +50,22 @@ namespace Corvus.EventStore.Example
                            .SetOwner(owner);
         }
 
+        /// <summary>
+        /// Sets the owner of the to do list.
+        /// </summary>
+        /// <param name="owner">The name of the owner.</param>
+        /// <returns>A <see cref="ToDoList"/> with the name updated.</returns>
         public ToDoList SetOwner(string owner)
         {
             // Then apply an event to set the owner
             throw new NotImplementedException();
         }
 
+        /// <summary>
+        /// Sets the start date of the todolist.
+        /// </summary>
+        /// <param name="startDate">The start date.</param>
+        /// <returns>A <see cref="ToDoList"/> with the start date updated.</returns>
         public ToDoList SetStartDate(DateTimeOffset startDate)
         {
             // Apply an event to set the start date
@@ -75,7 +85,7 @@ namespace Corvus.EventStore.Example
                 await writer.WriteAsync(
                     this.aggregate,
                     DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    NeverSnapshotPolicy<ToDoListAggregate>.Instance).ConfigureAwait(false));
+                    NeverSnapshotPolicy<AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>>.Instance).ConfigureAwait(false));
         }
     }
 }

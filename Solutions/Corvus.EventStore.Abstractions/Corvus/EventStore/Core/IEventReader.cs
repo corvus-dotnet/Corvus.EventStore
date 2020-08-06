@@ -21,13 +21,13 @@ namespace Corvus.EventStore.Core
         /// <param name="maxItems">The maximum number of items to return.</param>
         /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
         ValueTask<EventReaderResult> ReadCommitsAsync(
-            string aggregateId,
+            Guid aggregateId,
             long fromSequenceNumber,
             long toSequenceNumber,
             int maxItems);
 
         /// <summary>
-        /// Reads the next block in a result set initially acquired by calling <see cref="ReadCommitsAsync(string, long, long, int)"/>.
+        /// Reads the next block in a result set initially acquired by calling <see cref="ReadCommitsAsync(Guid, long, long, int)"/>.
         /// </summary>
         /// <param name="continuationToken">A continuation token returned from a previous call that can be used to
         /// obtain the next set of results.</param>

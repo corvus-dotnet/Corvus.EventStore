@@ -27,7 +27,7 @@ namespace Corvus.EventStore.Aggregates
         /// </remarks>
         ValueTask<TAggregate> ReadAsync<TAggregate>(
             Func<SerializedSnapshot, TAggregate> aggregateFactory,
-            string aggregateId,
+            Guid aggregateId,
             long sequenceNumber = long.MaxValue)
         where TAggregate : IAggregateRoot<TAggregate>;
     }

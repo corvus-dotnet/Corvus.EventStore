@@ -4,6 +4,7 @@
 
 namespace Corvus.EventStore.Core
 {
+    using System;
     using System.Collections.Immutable;
 
     /// <summary>
@@ -19,7 +20,7 @@ namespace Corvus.EventStore.Core
         /// <param name="sequenceNumber">The <see cref="SequenceNumber"/>.</param>
         /// <param name="timestamp">The <see cref="Timestamp"/>.</param>
         /// <param name="events">The <see cref="Events"/>.</param>
-        public Commit(string aggregateId, string partitionKey, long sequenceNumber, long timestamp, ImmutableArray<SerializedEvent> events)
+        public Commit(Guid aggregateId, string partitionKey, long sequenceNumber, long timestamp, ImmutableArray<SerializedEvent> events)
         {
             this.AggregateId = aggregateId;
             this.PartitionKey = partitionKey;
@@ -31,7 +32,7 @@ namespace Corvus.EventStore.Core
         /// <summary>
         /// Gets the ID of the aggregate for this commit.
         /// </summary>
-        public string AggregateId { get; }
+        public Guid AggregateId { get; }
 
         /// <summary>
         /// Gets the partition key for this commit.

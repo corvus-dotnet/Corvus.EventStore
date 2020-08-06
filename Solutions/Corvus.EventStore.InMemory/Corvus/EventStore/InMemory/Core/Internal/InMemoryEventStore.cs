@@ -19,8 +19,8 @@ namespace Corvus.EventStore.InMemory.Core.Internal
     /// <remarks>This is the equivalent to "SQL Server" or "Cosmos DB" for other stores - but we've had to implement it ourselves. We could have used a popular in-memory database instead.</remarks>
     public class InMemoryEventStore
     {
-        private readonly ConcurrentDictionary<string, CommitList> store =
-            new ConcurrentDictionary<string, CommitList>();
+        private readonly ConcurrentDictionary<Guid, CommitList> store =
+            new ConcurrentDictionary<Guid, CommitList>();
 
         /// <summary>
         /// Reads events from the store for an aggregate.
@@ -30,7 +30,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         /// <param name="toSequenceNumber">The maximum <see cref="Commit.SequenceNumber"/> to retreive.</param>
         /// <param name="maxItems">The maximum number of items to return.</param>
         /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
-        public ValueTask<EventReaderResult> ReadCommitsAsync(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
+        public ValueTask<EventReaderResult> ReadCommitsAsync(Guid aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
         {
             if (!this.store.TryGetValue(aggregateId, out CommitList list))
             {
@@ -55,7 +55,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         }
 
         /// <summary>
-        /// Reads the next block in a result set initially acquired by calling <see cref="ReadCommitsAsync(string, long, long, int)"/>.
+        /// Reads the next block in a result set initially acquired by calling <see cref="ReadCommitsAsync(Guid, long, long, int)"/>.
         /// </summary>
         /// <param name="encodedContinuationToken">A continuation token returned from a previous call that can be used to
         /// obtain the next set of results.</param>
@@ -105,7 +105,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
 
         private readonly struct ContinuationToken
         {
-            public ContinuationToken(string aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
+            public ContinuationToken(Guid aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
             {
                 this.FromSequenceNumber = fromSequenceNumber;
                 this.ToSequenceNumber = toSequenceNumber;
@@ -119,7 +119,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
 
             public int MaxItems { get; }
 
-            public string AggregateId { get; }
+            public Guid AggregateId { get; }
         }
 
         private readonly struct CommitList

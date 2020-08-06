@@ -4,6 +4,7 @@
 
 namespace Corvus.EventStore.InMemory.Snapshots
 {
+    using System;
     using System.Threading.Tasks;
     using Corvus.EventStore.InMemory.Snapshots.Internal;
     using Corvus.EventStore.Snapshots;
@@ -25,7 +26,7 @@ namespace Corvus.EventStore.InMemory.Snapshots
         }
 
         /// <inheritdoc/>
-        public ValueTask<SerializedSnapshot> ReadAsync(string aggregateId, long atSequenceId = long.MaxValue)
+        public ValueTask<SerializedSnapshot> ReadAsync(Guid aggregateId, long atSequenceId = long.MaxValue)
         {
             return this.store.ReadAsync(aggregateId, atSequenceId);
         }

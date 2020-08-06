@@ -4,6 +4,8 @@
 
 namespace Corvus.EventStore.Snapshots
 {
+    using System;
+
     /// <summary>
     /// Represents a snapshot of an aggregate at a point in its history.
     /// </summary>
@@ -19,7 +21,7 @@ namespace Corvus.EventStore.Snapshots
         /// <param name="commitSequenceNumber">The <see cref="CommitSequenceNumber"/>.</param>
         /// <param name="eventSequenceNumber">The <see cref="EventSequenceNumber"/>.</param>
         /// <param name="memento">The <see cref="Memento"/>.</param>
-        public Snapshot(string aggregateId, string partitionKey, long commitSequenceNumber, long eventSequenceNumber, in TMemento memento)
+        public Snapshot(Guid aggregateId, string partitionKey, long commitSequenceNumber, long eventSequenceNumber, in TMemento memento)
         {
             this.AggregateId = aggregateId;
             this.PartitionKey = partitionKey;
@@ -31,7 +33,7 @@ namespace Corvus.EventStore.Snapshots
         /// <summary>
         /// Gets the Id of the aggregate from which this snapshot was generated.
         /// </summary>
-        public string AggregateId { get; }
+        public Guid AggregateId { get; }
 
         /// <summary>
         /// Gets the sequence number of the commit which this snapshot represents.

@@ -21,7 +21,7 @@ namespace Corvus.EventStore.Core
         /// <param name="currentEventSequenceNumber">The current event sequence number of the aggregate.</param>
         /// <exception cref="InvalidOperationException">The enumerable was not valid. The reason is in the exception message.</exception>
         /// <remarks>This will pick up out-of-sequence commits and events. This also has the side effect of preventing you from applying a commit if you have uncommited events in the instance.</remarks>
-        public static void ValidateCommits(this IEnumerable<Commit> commits, string aggregateId, long currentCommitSequenceNumber, long currentEventSequenceNumber)
+        public static void ValidateCommits(this IEnumerable<Commit> commits, Guid aggregateId, long currentCommitSequenceNumber, long currentEventSequenceNumber)
         {
             long previousCommitSequenceNumber = currentCommitSequenceNumber;
             long previousEventSequenceNumber = currentEventSequenceNumber;
