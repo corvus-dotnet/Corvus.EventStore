@@ -27,7 +27,7 @@ namespace Corvus.EventStore.Aggregates
         /// <remarks>
         /// For most implementations, the AggregateId makes a good partition key.
         /// </remarks>
-        public string PartitionKey { get; }
+        string PartitionKey { get; }
 
         /// <summary>
         /// Gets the sequence number of the current commit for the aggregate.
@@ -54,12 +54,12 @@ namespace Corvus.EventStore.Aggregates
         TAggregate ApplyEvent<TPayload>(in Event<TPayload> @event);
 
         /// <summary>
-        /// Applies the given events to the aggregate.
+        /// Applies the given commits to the aggregate.
         /// </summary>
         /// <param name="commits">The ordered list of commits to apply to the aggregate.</param>
-        /// <returns>The aggreagte with the events applied.</returns>
+        /// <returns>The aggreagte with the commits applied.</returns>
         /// <remarks>
-        /// This will typically be called when the aggregate is being rehydrated from stored events.
+        /// This will be called when the aggregate is being rehydrated from committed events.
         /// </remarks>
         TAggregate ApplyCommits(in IEnumerable<Commit> commits);
 
