@@ -19,4 +19,8 @@
     <ProjectReference Include="..\Corvus.EventStore.Abstractions\Corvus.EventStore.Abstractions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Corvus.EventStore.Serialization\Json\Converters\" />
+  </ItemGroup>
+
 </Project>

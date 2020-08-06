@@ -7,6 +7,7 @@ namespace Corvus.EventStore.Aggregates
     using System;
     using System.Collections.Generic;
     using System.Collections.Immutable;
+    using System.Runtime.CompilerServices;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
     using Corvus.EventStore.Serialization;
@@ -44,12 +45,12 @@ namespace Corvus.EventStore.Aggregates
         /// <summary>
         /// Gets or sets the event serializer to use for the aggregate.
         /// </summary>
-        public static IEventSerializer EventSerializer { get; set; } = default(Utf8JsonEventSerializer);
+        public static IEventSerializer EventSerializer { get; set; } = new Utf8JsonEventSerializer(Utf8JsonEventSerializer.DefaultOptions);
 
         /// <summary>
         /// Gets or sets the snapshot serializer to use for the aggregate.
         /// </summary>
-        public static ISnapshotSerializer SnapshotSerializer { get; set; } = default(Utf8JsonSnapshotSerializer);
+        public static ISnapshotSerializer SnapshotSerializer { get; set; } = new Utf8JsonSnapshotSerializer(Utf8JsonSnapshotSerializer.DefaultOptions);
 
         /// <summary>
         /// Gets the unique Id for the aggregate.
@@ -93,21 +94,29 @@ namespace Corvus.EventStore.Aggregates
         /// <typeparam name="TReader">The type of the <see cref="IAggregateReader"/>.</typeparam>
         /// <param name="reader">The reader from which to read the aggregate.</param>
         /// <param name="aggregateId">The id of the aggregate to read.</param>
+        /// <param name="partitionKey">The partition key of the aggregate.</param>
         /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
         /// <returns>A <see cref="ValueTask"/> which completes with the aggregate.</returns>
-        public static ValueTask<AggregateWithMemento<TImplementation, TMemento>> Read<TReader>(TReader reader, Guid aggregateId, long commitSequenceNumber = long.MaxValue)
+        public static ValueTask<AggregateWithMemento<TImplementation, TMemento>> Read<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue)
             where TReader : IAggregateReader
         {
-            return reader.ReadAsync(s => CreateFrom(s), aggregateId, commitSequenceNumber);
+            return reader.ReadAsync(s => CreateFrom(aggregateId, partitionKey, s), aggregateId, partitionKey, commitSequenceNumber);
         }
 
         /// <summary>
         /// Creates an instance of the implementation from a snapshot.
         /// </summary>
+        /// <param name="aggregateId">The id of the aggregate to read.</param>
+        /// <param name="partitionKey">The partition key of the aggregate.</param>
         /// <param name="snapshot">The <see cref="SerializedSnapshot"/> from which to create the state.</param>
         /// <returns>The state with the snapshot applied.</returns>
-        public static AggregateWithMemento<TImplementation, TMemento> CreateFrom(SerializedSnapshot snapshot)
+        public static AggregateWithMemento<TImplementation, TMemento> CreateFrom(Guid aggregateId, string partitionKey, SerializedSnapshot snapshot)
         {
+            if (snapshot.IsEmpty)
+            {
+                return new AggregateWithMemento<TImplementation, TMemento>(aggregateId, partitionKey, -1, -1, ImmutableArray<SerializedEvent>.Empty, new TMemento());
+            }
+
             return new AggregateWithMemento<TImplementation, TMemento>(
                 snapshot.AggregateId,
                 snapshot.PartitionKey,

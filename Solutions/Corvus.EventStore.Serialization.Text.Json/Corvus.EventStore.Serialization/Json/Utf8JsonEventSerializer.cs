@@ -7,12 +7,18 @@ namespace Corvus.EventStore.Serialization.Json
     using System.Text.Json;
     using Corvus.EventStore.Core;
     using Corvus.EventStore.Serialization;
+    using Corvus.EventStore.Serialization.Json.Converters;
 
     /// <summary>
     /// An <see cref="IEventSerializer"/> that uses utf8 JSON text.
     /// </summary>
     public readonly struct Utf8JsonEventSerializer : IEventSerializer
     {
+        /// <summary>
+        /// Default JsonSerializer options.
+        /// </summary>
+        public static readonly JsonSerializerOptions DefaultOptions = CreateDefaultOptions();
+
         private readonly JsonSerializerOptions options;
 
         /// <summary>
@@ -41,6 +47,13 @@ namespace Corvus.EventStore.Serialization.Json
                 @event.SequenceNumber,
                 @event.Timestamp,
                 utf8Bytes);
+        }
+
+        private static JsonSerializerOptions CreateDefaultOptions()
+        {
+            var options = new JsonSerializerOptions();
+            options.Converters.Add(new ImmutableDictionaryTKeyTValueConverter());
+            return options;
         }
     }
 }

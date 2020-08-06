@@ -5,6 +5,7 @@
 namespace Corvus.EventStore.Serialization.Json
 {
     using System.Text.Json;
+    using Corvus.EventStore.Serialization.Json.Converters;
     using Corvus.EventStore.Snapshots;
 
     /// <summary>
@@ -12,6 +13,11 @@ namespace Corvus.EventStore.Serialization.Json
     /// </summary>
     public readonly struct Utf8JsonSnapshotSerializer : ISnapshotSerializer
     {
+        /// <summary>
+        /// Default JsonSerializer options.
+        /// </summary>
+        public static readonly JsonSerializerOptions DefaultOptions = CreateDefaultOptions();
+
         private readonly JsonSerializerOptions options;
 
         /// <summary>
@@ -48,6 +54,13 @@ namespace Corvus.EventStore.Serialization.Json
                 snapshot.CommitSequenceNumber,
                 snapshot.EventSequenceNumber,
                 utf8Bytes);
+        }
+
+        private static JsonSerializerOptions CreateDefaultOptions()
+        {
+            var options = new JsonSerializerOptions();
+            options.Converters.Add(new ImmutableDictionaryTKeyTValueConverter());
+            return options;
         }
     }
 }

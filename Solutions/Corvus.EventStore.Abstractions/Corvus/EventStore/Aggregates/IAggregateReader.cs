@@ -19,6 +19,7 @@ namespace Corvus.EventStore.Aggregates
         /// <typeparam name="TAggregate">The type of aggregate being read.</typeparam>
         /// <param name="aggregateFactory">A factory method for creating an aggregate from a snapshot.</param>
         /// <param name="aggregateId">The Id of the aggregate.</param>
+        /// <param name="partitionKey">The partition key of the aggregate.</param>
         /// <param name="sequenceNumber">The maximum sequence number to retrieve.</param>
         /// <returns>The specified aggregate.</returns>
         /// <remarks>
@@ -28,6 +29,7 @@ namespace Corvus.EventStore.Aggregates
         ValueTask<TAggregate> ReadAsync<TAggregate>(
             Func<SerializedSnapshot, TAggregate> aggregateFactory,
             Guid aggregateId,
+            string partitionKey,
             long sequenceNumber = long.MaxValue)
         where TAggregate : IAggregateRoot<TAggregate>;
     }

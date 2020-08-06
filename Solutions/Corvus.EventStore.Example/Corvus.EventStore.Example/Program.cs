@@ -33,7 +33,11 @@ namespace Corvus.EventStore.Example
             // We Do things to it and commit it.
 
             // This is the ID of our aggregate - imagine this came in from the request, for example.
-            var aggregateId = Guid.Parse("2c46ed1c-474e-4c94-ac44-0570a46ceb30");
+            string aggregateIdAsString = "2c46ed1c-474e-4c94-ac44-0570a46ceb30";
+            var aggregateId = Guid.Parse(aggregateIdAsString);
+
+            // Using the Id as the partition key.
+            string? partitionKey = aggregateIdAsString;
 
             // Create an aggregate reader for the configured store. This is cheap and can be done every time. It is stateless.
             // You would typically get this as a transient from the container. But as you can see you can just new everything up, too.
@@ -49,7 +53,7 @@ namespace Corvus.EventStore.Example
             // While you can hand-roll your own aggregates from scratch, it is usually better to use one of the precanned
             // implementation patterns, of which we have provided one in this demo (one that is implemented over an internal
             // memento which it uses to produce its snapshots).
-            ToDoList toDoList = await ToDoList.Read(reader, aggregateId).ConfigureAwait(false);
+            ToDoList toDoList = await ToDoList.Read(reader, aggregateId, partitionKey).ConfigureAwait(false);
 
             string currentUser = "Bill Gates";
 

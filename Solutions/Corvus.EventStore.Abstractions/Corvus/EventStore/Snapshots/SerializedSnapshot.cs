@@ -62,7 +62,6 @@ namespace Corvus.EventStore.Snapshots
             this.CommitSequenceNumber = commitSequenceNumber;
             this.EventSequenceNumber = eventSequenceNumber;
             this.Memento = memento;
-            this.IsEmpty = false;
         }
 
         /// <summary>

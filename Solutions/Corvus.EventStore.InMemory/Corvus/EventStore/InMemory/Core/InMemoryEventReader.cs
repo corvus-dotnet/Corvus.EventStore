@@ -32,7 +32,7 @@ namespace Corvus.EventStore.InMemory.Core
         }
 
         /// <inheritdoc/>
-        public ValueTask<EventReaderResult> ReadCommitsAsync(Guid aggregateId, long fromSequenceNumber, long toSequenceNumber, int maxItems)
+        public ValueTask<EventReaderResult> ReadCommitsAsync(Guid aggregateId, string partitionKey, long fromSequenceNumber, long toSequenceNumber, int maxItems)
         {
             return this.store.ReadCommitsAsync(aggregateId, fromSequenceNumber, toSequenceNumber, maxItems);
         }

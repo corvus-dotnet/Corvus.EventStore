@@ -27,12 +27,13 @@ namespace Corvus.EventStore.Example
         /// <typeparam name="TReader">The type of the <see cref="IAggregateReader"/>.</typeparam>
         /// <param name="reader">The reader from which to read the aggregate.</param>
         /// <param name="aggregateId">The id of the aggregate to read.</param>
+        /// <param name="partitionKey">The partition key of the aggregate to read.</param>
         /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
         /// <returns>A <see cref="ValueTask"/> which completes with the to do list.</returns>
-        public static async ValueTask<ToDoList> Read<TReader>(TReader reader, Guid aggregateId, long commitSequenceNumber = long.MaxValue)
+        public static async ValueTask<ToDoList> Read<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue)
             where TReader : IAggregateReader
         {
-            AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Read(reader, aggregateId, commitSequenceNumber).ConfigureAwait(false);
+            AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Read(reader, aggregateId, partitionKey, commitSequenceNumber).ConfigureAwait(false);
             return new ToDoList(aggregate);
         }
 

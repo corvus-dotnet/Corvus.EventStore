@@ -36,16 +36,18 @@ namespace Corvus.EventStore.Aggregates
         public async ValueTask<TAggregate> ReadAsync<TAggregate>(
             Func<SerializedSnapshot, TAggregate> aggregateFactory,
             Guid aggregateId,
+            string partitionKey,
             long sequenceNumber = long.MaxValue)
             where TAggregate : IAggregateRoot<TAggregate>
         {
-            SerializedSnapshot serializedSnapshot = await this.snapshotReader.ReadAsync(aggregateId, sequenceNumber).ConfigureAwait(false);
+            SerializedSnapshot serializedSnapshot = await this.snapshotReader.ReadAsync(aggregateId, partitionKey, sequenceNumber).ConfigureAwait(false);
             TAggregate aggregate = aggregateFactory(serializedSnapshot);
 
             if (aggregate.CommitSequenceNumber < sequenceNumber)
             {
                 EventReaderResult newEvents = await this.eventReader.ReadCommitsAsync(
                     aggregate.AggregateId,
+                    aggregate.PartitionKey,
                     aggregate.CommitSequenceNumber + 1,
                     sequenceNumber,
                     int.MaxValue).ConfigureAwait(false);
