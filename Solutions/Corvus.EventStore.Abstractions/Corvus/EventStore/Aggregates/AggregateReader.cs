@@ -14,8 +14,7 @@ namespace Corvus.EventStore.Aggregates
     /// </summary>
     /// <typeparam name="TEventReader">The type of the underlying event reader.</typeparam>
     /// <typeparam name="TSnapshotReader">The type of the underlying snapshot reader.</typeparam>
-    /// <typeparam name="TMemento">The memento type used by the aggregate that can be read by this reader.</typeparam>
-    public readonly struct AggregateReader<TEventReader, TSnapshotReader, TMemento>
+    public readonly struct AggregateReader<TEventReader, TSnapshotReader>
         where TEventReader : IEventReader
         where TSnapshotReader : ISnapshotReader
     {
@@ -23,7 +22,7 @@ namespace Corvus.EventStore.Aggregates
         private readonly TSnapshotReader snapshotReader;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="AggregateReader{TEventReader, TSnapshotReader, TMemento}"/> struct.
+        /// Initializes a new instance of the <see cref="AggregateReader{TEventReader, TSnapshotReader}"/> struct.
         /// </summary>
         /// <param name="eventReader">The underlying event reader.</param>
         /// <param name="snapshotReader">The underlying snapshot reader.</param>
