@@ -4,8 +4,10 @@
 
 namespace Corvus.EventStore.Example
 {
+    using System;
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
+    using Corvus.EventStore.Example.Internal;
     using Corvus.EventStore.InMemory.Aggregates;
     using Corvus.EventStore.InMemory.Core;
     using Corvus.EventStore.InMemory.Core.Internal;
@@ -32,7 +34,11 @@ namespace Corvus.EventStore.Example
             AggregateReader<InMemoryEventReader, InMemorySnapshotReader> reader =
                 InMemoryAggregateReader.GetInstance(inMemoryEventStore, inMemorySnapshotStore);
 
-            Aggregate<ToDoList> aggregate = await ToDoList.Read(reader, "someid").ConfigureAwait(false);
+            ToDoList toDoList = await ToDoList.Read(reader, "someid").ConfigureAwait(false);
+
+            string currentUser = "Bill Gates";
+
+            toDoList = toDoList.Initialize(DateTimeOffset.Now, currentUser);
 
             // Example 2: Retrieve an instance of an aggregate from the store. Do more things to it and save it again.
         }
