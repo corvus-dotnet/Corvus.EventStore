@@ -86,6 +86,7 @@ namespace Corvus.EventStore.Example
 
             Console.WriteLine("Committed having added a couple of items.");
 
+            // Example 4: Concurrency issue
             // Now, if we try to update toDoList we will get a concurrency exception, as it has moved on since that instance
             // was created (i.e. someone else snuck in and updated it in another instance - in this case us!)
             toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "Who has been eating *my* porridge?", "Bet it was that Goldilocks.");
@@ -96,6 +97,22 @@ namespace Corvus.EventStore.Example
             catch (ConcurrencyException ex)
             {
                 Console.WriteLine($"Bad luck - {ex.Message}");
+            }
+
+            // Example 5: Domain logic validation
+            // Validation occurs in the domain layer (or e.g. the command handler if you were using commands instead of this domain object wrapper)
+            // You inspect the current state of the system. Remember - you will get a concurrency exception on commit if someone has changed the
+            // state beneath you and you have to get the aggregate back and start again, so this is perfectly safe!
+            var newItemId = Guid.NewGuid();
+            toDoList3 = toDoList3.AddToDoItem(newItemId, "You can add me once.", string.Empty);
+
+            try
+            {
+                toDoList3 = toDoList3.AddToDoItem(newItemId, "But you can't add me twice.", string.Empty);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.WriteLine($"Oh dear - {ex.Message}");
             }
         }
     }

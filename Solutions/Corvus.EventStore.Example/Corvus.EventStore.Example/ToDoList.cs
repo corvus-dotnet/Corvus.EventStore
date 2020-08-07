@@ -99,6 +99,11 @@ namespace Corvus.EventStore.Example
         /// <returns>A <see cref="ToDoList"/> with the start date updated.</returns>
         public ToDoList AddToDoItem(Guid id, string title, string description)
         {
+            if (this.aggregate.Memento.Items.ContainsKey(id))
+            {
+                throw new InvalidOperationException($"The item with id {id} has already been added");
+            }
+
             // Apply an event to add an item
             // Then apply an event to set the owner
             return new ToDoList(
