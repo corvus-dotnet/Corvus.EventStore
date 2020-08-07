@@ -97,7 +97,7 @@ namespace Corvus.EventStore.Aggregates
         /// <param name="maxItemsPerBatch">The optional maximum number of items per batch. The default is 100.</param>
         /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
         /// <returns>A <see cref="ValueTask"/> which completes with the aggregate.</returns>
-        public static ValueTask<AggregateWithMemento<TImplementation, TMemento>> Read<TReader>(TReader reader, Guid aggregateId, string partitionKey, int maxItemsPerBatch = 100, long commitSequenceNumber = long.MaxValue)
+        public static ValueTask<AggregateWithMemento<TImplementation, TMemento>> ReadAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, int maxItemsPerBatch = 100, long commitSequenceNumber = long.MaxValue)
             where TReader : IAggregateReader
         {
             return reader.ReadAsync(s => CreateFrom(s), aggregateId, partitionKey, maxItemsPerBatch, commitSequenceNumber);

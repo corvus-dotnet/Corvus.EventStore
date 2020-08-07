@@ -32,7 +32,7 @@ namespace Corvus.EventStore.Aggregates
         }
 
         /// <inheritdoc/>
-        public async ValueTask<TAggregate> WriteAsync<TAggregate, TSnapshotPolicy>(
+        public async ValueTask<TAggregate> CommitAsync<TAggregate, TSnapshotPolicy>(
             TAggregate aggregate,
             long timestamp,
             TSnapshotPolicy snapshotPolicy = default)

@@ -34,10 +34,10 @@ namespace Corvus.EventStore.Example
         /// <param name="partitionKey">The partition key of the aggregate to read.</param>
         /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
         /// <returns>A <see cref="ValueTask"/> which completes with the to do list.</returns>
-        public static async ValueTask<ToDoList> Read<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue)
+        public static async ValueTask<ToDoList> ReadAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue)
             where TReader : IAggregateReader
         {
-            AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Read(reader, aggregateId, partitionKey, MaxItemsPerBatch, commitSequenceNumber).ConfigureAwait(false);
+            AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.ReadAsync(reader, aggregateId, partitionKey, MaxItemsPerBatch, commitSequenceNumber).ConfigureAwait(false);
             return new ToDoList(aggregate);
         }
 
@@ -138,7 +138,7 @@ namespace Corvus.EventStore.Example
         {
             // Note that we have a policy here that says "never create snapshots".
             return new ToDoList(
-                await writer.WriteAsync(
+                await writer.CommitAsync(
                     this.aggregate,
                     DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                     NeverSnapshotPolicy<AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>>.Instance).ConfigureAwait(false));

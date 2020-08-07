@@ -12,7 +12,7 @@ namespace Corvus.EventStore.Aggregates
     public interface IAggregateWriter
     {
         /// <summary>
-        /// Writes new events for the supplied aggregate to the event store, using the supplied snapshot policy to
+        /// Commits uncommitted events for the supplied aggregate to the event store, using the supplied snapshot policy to
         /// determine whether a new snapshot should also be stored.
         /// </summary>
         /// <typeparam name="TAggregate">The type of aggregate being stored.</typeparam>
@@ -21,7 +21,7 @@ namespace Corvus.EventStore.Aggregates
         /// <param name="timestamp">The nominal current wall clock timestamp as determined by the caller.</param>
         /// <param name="snapshotPolicy">The snapshot policy to use to determine whether a new shapshot should be created.</param>
         /// <returns>The aggregate with all new events committed.</returns>
-        ValueTask<TAggregate> WriteAsync<TAggregate, TSnapshotPolicy>(TAggregate aggregate, long timestamp, TSnapshotPolicy snapshotPolicy = default)
+        ValueTask<TAggregate> CommitAsync<TAggregate, TSnapshotPolicy>(TAggregate aggregate, long timestamp, TSnapshotPolicy snapshotPolicy = default)
             where TAggregate : IAggregateRoot<TAggregate>
             where TSnapshotPolicy : struct, IAggregateWriterSnapshotPolicy<TAggregate>;
     }

@@ -53,7 +53,7 @@ namespace Corvus.EventStore.Example
             // While you can hand-roll your own aggregates from scratch, it is usually better to use one of the precanned
             // implementation patterns, of which we have provided one in this demo (one that is implemented over an internal
             // memento which it uses to produce its snapshots).
-            ToDoList toDoList = await ToDoList.Read(reader, aggregateId, partitionKey).ConfigureAwait(false);
+            ToDoList toDoList = await ToDoList.ReadAsync(reader, aggregateId, partitionKey).ConfigureAwait(false);
 
             string currentUser = "Bill Gates";
 
@@ -70,7 +70,7 @@ namespace Corvus.EventStore.Example
             toDoList.ToString();
 
             // Example 2: Retrieve an instance of an aggregate from the store. Do more things to it and save it again.
-            ToDoList toDoList2 = await ToDoList.Read(reader, aggregateId, partitionKey).ConfigureAwait(false);
+            ToDoList toDoList2 = await ToDoList.ReadAsync(reader, aggregateId, partitionKey).ConfigureAwait(false);
 
             toDoList2 = toDoList2.AddToDoItem("This is my title", "This is my description");
             toDoList2 = await toDoList2.CommitAsync(writer).ConfigureAwait(false);
@@ -78,7 +78,7 @@ namespace Corvus.EventStore.Example
             toDoList2.ToString();
 
             // Example 3: Just get it back again.
-            ToDoList toDoList3 = await ToDoList.Read(reader, aggregateId, partitionKey).ConfigureAwait(false);
+            ToDoList toDoList3 = await ToDoList.ReadAsync(reader, aggregateId, partitionKey).ConfigureAwait(false);
 
             toDoList3.ToString();
         }
