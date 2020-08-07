@@ -8,8 +8,9 @@ namespace Corvus.EventStore.Example
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
     using Corvus.EventStore.Core;
-    using Corvus.EventStore.Example.Internal;
+    using Corvus.EventStore.Example.Internal.EventHandlers;
     using Corvus.EventStore.Example.Internal.Events;
+    using Corvus.EventStore.Example.Internal.Mementos;
 
     /// <summary>
     /// A to do list backed by an aggregate root.
