@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore.Serializa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore.Aggregates", "Corvus.EventStore.Aggregates\Corvus.EventStore.Aggregates.csproj", "{D0CC6874-3EA7-4709-B716-4ABE10D89B22}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore.AzureTableStorage", "Corvus.EventStore.AzureTableStorage\Corvus.EventStore.AzureTableStorage.csproj", "{154C87B7-1481-4B83-9814-B7CC1759FD06}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{D0CC6874-3EA7-4709-B716-4ABE10D89B22}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D0CC6874-3EA7-4709-B716-4ABE10D89B22}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D0CC6874-3EA7-4709-B716-4ABE10D89B22}.Release|Any CPU.Build.0 = Release|Any CPU
+		{154C87B7-1481-4B83-9814-B7CC1759FD06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{154C87B7-1481-4B83-9814-B7CC1759FD06}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{154C87B7-1481-4B83-9814-B7CC1759FD06}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{154C87B7-1481-4B83-9814-B7CC1759FD06}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
