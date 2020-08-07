@@ -7,6 +7,7 @@ namespace Corvus.EventStore.Example
     using System;
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
+    using Corvus.EventStore.Core;
     using Corvus.EventStore.InMemory.Aggregates;
     using Corvus.EventStore.InMemory.Core;
     using Corvus.EventStore.InMemory.Core.Internal;
@@ -67,20 +68,35 @@ namespace Corvus.EventStore.Example
             // Commit whatever batch of events we had for that Initialize operation.
             toDoList = await toDoList.CommitAsync(writer).ConfigureAwait(false);
 
-            toDoList.ToString();
+            Console.WriteLine("Committed the initialization");
 
             // Example 2: Retrieve an instance of an aggregate from the store. Do more things to it and save it again.
             ToDoList toDoList2 = await ToDoList.ReadAsync(reader, aggregateId, partitionKey).ConfigureAwait(false);
 
-            toDoList2 = toDoList2.AddToDoItem("This is my title", "This is my description");
+            // Note that this is an atomic operation adding two items
+            toDoList2 = toDoList2.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
+            toDoList2 = toDoList2.AddToDoItem(Guid.NewGuid(), "Another day, another item", "This is the item in question");
+
             toDoList2 = await toDoList2.CommitAsync(writer).ConfigureAwait(false);
 
-            toDoList2.ToString();
+            Console.WriteLine("Committed having added a couple of items.");
 
             // Example 3: Just get it back again.
             ToDoList toDoList3 = await ToDoList.ReadAsync(reader, aggregateId, partitionKey).ConfigureAwait(false);
 
-            toDoList3.ToString();
+            Console.WriteLine("Committed having added a couple of items.");
+
+            // Now, if we try to update toDoList we will get a concurrency exception, as it has moved on since that instance
+            // was created (i.e. someone else snuck in and updated it in another instance - in this case us!)
+            toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "Who has been eating *my* porridge?", "Bet it was that Goldilocks.");
+            try
+            {
+                toDoList = await toDoList.CommitAsync(writer).ConfigureAwait(false);
+            }
+            catch (ConcurrencyException ex)
+            {
+                Console.WriteLine($"Bad luck - {ex.Message}");
+            }
         }
     }
 }

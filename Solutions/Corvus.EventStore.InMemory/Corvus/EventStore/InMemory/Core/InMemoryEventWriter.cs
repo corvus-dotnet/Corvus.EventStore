@@ -25,10 +25,16 @@ namespace Corvus.EventStore.InMemory.Core
         }
 
         /// <inheritdoc/>
-        public Task WriteCommitAsync(Commit commit)
+        public async Task WriteCommitAsync(Commit commit)
         {
-            // TODO: Catch store-specific exception and turn it into an IEventWriter concurrency exception/failure.
-            return this.store.WriteCommitAsync(commit);
+            try
+            {
+                await this.store.WriteCommitAsync(commit).ConfigureAwait(false);
+            }
+            catch (InMemoryEventStoreConcurrencyException ex)
+            {
+                throw new ConcurrencyException($"Unable to write the commit for aggregateID {commit.AggregateId} with sequence number {commit.SequenceNumber}.", ex);
+            }
         }
     }
 }

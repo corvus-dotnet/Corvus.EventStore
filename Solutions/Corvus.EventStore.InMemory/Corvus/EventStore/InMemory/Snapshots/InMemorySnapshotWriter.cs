@@ -5,6 +5,7 @@
 namespace Corvus.EventStore.InMemory.Snapshots
 {
     using System.Threading.Tasks;
+    using Corvus.EventStore.Core;
     using Corvus.EventStore.InMemory.Snapshots.Internal;
     using Corvus.EventStore.Snapshots;
 
@@ -25,9 +26,16 @@ namespace Corvus.EventStore.InMemory.Snapshots
         }
 
         /// <inheritdoc/>
-        public Task WriteAsync(SerializedSnapshot snapshot)
+        public async Task WriteAsync(SerializedSnapshot snapshot)
         {
-            return this.store.WriteAsync(snapshot);
+            try
+            {
+                await this.store.WriteAsync(snapshot).ConfigureAwait(false);
+            }
+            catch (InMemorySnapshotStoreConcurrencyException ex)
+            {
+                throw new ConcurrencyException("Unable to write the snapshot.", ex);
+            }
         }
     }
 }

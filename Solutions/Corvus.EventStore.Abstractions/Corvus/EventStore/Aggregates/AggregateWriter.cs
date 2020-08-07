@@ -4,6 +4,7 @@
 
 namespace Corvus.EventStore.Aggregates
 {
+    using System;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
     using Corvus.EventStore.Snapshots;
@@ -43,7 +44,16 @@ namespace Corvus.EventStore.Aggregates
 
             if (snapshotPolicy.ShouldSnapshot(aggregate, timestamp))
             {
-                await aggregate.StoreSnapshotAsync(this.snapshotWriter).ConfigureAwait(false);
+                try
+                {
+                    await aggregate.StoreSnapshotAsync(this.snapshotWriter).ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    // We should log the fact that the snapshot storage has failed, but not
+                    // blow up - the fact that the events have been committed means we are
+                    // successful
+                }
             }
 
             return aggregate;

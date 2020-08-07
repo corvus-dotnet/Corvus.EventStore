@@ -68,7 +68,7 @@ namespace Corvus.EventStore.Example
                     new Event<ToDoListOwnerSetEventPayload>(
                         ToDoListOwnerSetEventPayload.EventType,
                         this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                         new ToDoListOwnerSetEventPayload(owner))));
         }
 
@@ -86,17 +86,18 @@ namespace Corvus.EventStore.Example
                     new Event<ToDoListStartDateSetEventPayload>(
                         ToDoListStartDateSetEventPayload.EventType,
                         this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                         new ToDoListStartDateSetEventPayload(startDate))));
         }
 
         /// <summary>
         /// Adds an item to the todo list.
         /// </summary>
+        /// <param name="id">The id of the item.</param>
         /// <param name="title">The title of the item.</param>
         /// <param name="description">The description of the item.</param>
         /// <returns>A <see cref="ToDoList"/> with the start date updated.</returns>
-        public ToDoList AddToDoItem(string title, string description)
+        public ToDoList AddToDoItem(Guid id, string title, string description)
         {
             // Apply an event to add an item
             // Then apply an event to set the owner
@@ -105,8 +106,8 @@ namespace Corvus.EventStore.Example
                     new Event<ToDoItemAddedEventPayload>(
                         ToDoItemAddedEventPayload.EventType,
                         this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.Now.ToUnixTimeMilliseconds(),
-                        new ToDoItemAddedEventPayload(Guid.NewGuid(), title, description))));
+                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        new ToDoItemAddedEventPayload(id, title, description))));
         }
 
         /// <summary>
@@ -123,7 +124,7 @@ namespace Corvus.EventStore.Example
                     new Event<ToDoItemRemovedEventPayload>(
                         ToDoItemRemovedEventPayload.EventType,
                         this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.Now.ToUnixTimeMilliseconds(),
+                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                         new ToDoItemRemovedEventPayload(id))));
         }
 
