@@ -11,8 +11,12 @@ namespace Corvus.EventStore.Example.Internal.EventHandlers
     using Corvus.EventStore.Example.Internal.Mementos;
 
     /// <summary>
-    /// The aggregate root for a ToDo list containing ToDo items.
+    /// The event handler for a ToDo list containing ToDo items.
     /// </summary>
+    /// <remarks>
+    /// Notice that we are using direct dispatch here for efficiency. For separation of concerns and extensibility, you could choose to
+    /// use our contenttype dispatch pattern and wrap all these things up into individual handler types. But I'm not sure you gain much.
+    /// </remarks>
     internal readonly struct ToDoListEventHandler : IAggregateEventHandler<ToDoListEventHandler, ToDoListMemento>
     {
         /// <inheritdoc/>
