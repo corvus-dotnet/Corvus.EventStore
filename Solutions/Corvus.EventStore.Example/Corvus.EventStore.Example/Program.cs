@@ -37,7 +37,7 @@ namespace Corvus.EventStore.Example
             var aggregateId = Guid.Parse(aggregateIdAsString);
 
             // Using the Id as the partition key.
-            string? partitionKey = aggregateIdAsString;
+            string partitionKey = aggregateIdAsString;
 
             // Create an aggregate reader for the configured store. This is cheap and can be done every time. It is stateless.
             // You would typically get this as a transient from the container. But as you can see you can just new everything up, too.
