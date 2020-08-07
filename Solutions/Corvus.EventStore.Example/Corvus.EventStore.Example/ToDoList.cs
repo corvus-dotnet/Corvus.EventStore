@@ -141,7 +141,7 @@ namespace Corvus.EventStore.Example
                 await writer.WriteAsync(
                     this.aggregate,
                     DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    AlwaysSnapshotPolicy<AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>>.Instance).ConfigureAwait(false));
+                    NeverSnapshotPolicy<AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>>.Instance).ConfigureAwait(false));
         }
     }
 }

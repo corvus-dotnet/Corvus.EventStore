@@ -6,9 +6,9 @@ namespace Corvus.EventStore.Example.Internal
 {
     using System;
     using System.Collections.Immutable;
-    using System.Diagnostics;
     using System.Text.Json;
     using System.Text.Json.Serialization;
+    using Corvus.EventStore.Serialization.Json.Converters;
 
     /// <summary>
     /// A memento for the current state of a TodoList object.
@@ -107,104 +107,16 @@ namespace Corvus.EventStore.Example.Internal
                     throw new JsonException();
                 }
 
-                ImmutableDictionary<Guid, ToDoItemMemento> items = ImmutableDictionary<Guid, ToDoItemMemento>.Empty;
-                bool itemsSet = false;
+                (ImmutableDictionary<Guid, ToDoItemMemento> items, string owner, DateTimeOffset startDate) =
+                    (ImmutableDictionary<Guid, ToDoItemMemento>.Empty, string.Empty, default);
 
-                string owner = string.Empty;
-                bool ownerSet = false;
-
-                DateTimeOffset startDate = default;
-                bool startDateSet = false;
-
-                // Get the first property.
-                reader.Read();
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    throw new JsonException();
-                }
-
-                if (reader.ValueTextEquals(this.itemsName.EncodedUtf8Bytes))
-                {
-                    items = this.ReadImmutableDictionaryProperty(ref reader, options);
-                    itemsSet = true;
-                }
-                else if (reader.ValueTextEquals(this.ownerName.EncodedUtf8Bytes))
-                {
-                    owner = this.ReadStringProperty(ref reader, options);
-                    ownerSet = true;
-                }
-                else if (reader.ValueTextEquals(this.startDateName.EncodedUtf8Bytes))
-                {
-                    startDate = this.ReadDateTimeOffsetProperty(ref reader, options);
-                    startDateSet = true;
-                }
-                else
-                {
-                    throw new JsonException();
-                }
-
-                // Get the second property.
-                reader.Read();
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    throw new JsonException();
-                }
-
-                if (reader.ValueTextEquals(this.itemsName.EncodedUtf8Bytes))
-                {
-                    items = this.ReadImmutableDictionaryProperty(ref reader, options);
-                    itemsSet = true;
-                }
-                else if (reader.ValueTextEquals(this.ownerName.EncodedUtf8Bytes))
-                {
-                    owner = this.ReadStringProperty(ref reader, options);
-                    ownerSet = true;
-                }
-                else if (reader.ValueTextEquals(this.startDateName.EncodedUtf8Bytes))
-                {
-                    startDate = this.ReadDateTimeOffsetProperty(ref reader, options);
-                    startDateSet = true;
-                }
-                else
-                {
-                    throw new JsonException();
-                }
-
-                // Get the third property.
-                reader.Read();
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    throw new JsonException();
-                }
-
-                if (reader.ValueTextEquals(this.itemsName.EncodedUtf8Bytes))
-                {
-                    items = this.ReadImmutableDictionaryProperty(ref reader, options);
-                    itemsSet = true;
-                }
-                else if (reader.ValueTextEquals(this.ownerName.EncodedUtf8Bytes))
-                {
-                    owner = this.ReadStringProperty(ref reader, options);
-                    ownerSet = true;
-                }
-                else if (reader.ValueTextEquals(this.startDateName.EncodedUtf8Bytes))
-                {
-                    startDate = this.ReadDateTimeOffsetProperty(ref reader, options);
-                    startDateSet = true;
-                }
-                else
-                {
-                    throw new JsonException();
-                }
+                (items, owner, startDate) = this.ReadProperty(ref reader, options, (items, owner, startDate));
+                (items, owner, startDate) = this.ReadProperty(ref reader, options, (items, owner, startDate));
+                (items, owner, startDate) = this.ReadProperty(ref reader, options, (items, owner, startDate));
 
                 reader.Read();
 
                 if (reader.TokenType != JsonTokenType.EndObject)
-                {
-                    throw new JsonException();
-                }
-
-                if (!(itemsSet && ownerSet && startDateSet))
                 {
                     throw new JsonException();
                 }
@@ -219,82 +131,36 @@ namespace Corvus.EventStore.Example.Internal
                 JsonSerializerOptions options)
             {
                 writer.WriteStartObject();
-                this.WriteDateTimeOffsetProperty(writer, this.startDateName, memento.StartDate, options);
-                this.WriteStringProperty(writer, this.ownerName, memento.Owner, options);
-                this.WriteImmutableDictionaryProperty(writer, this.itemsName, memento.Items ?? ImmutableDictionary<Guid, ToDoItemMemento>.Empty, options);
+                ConverterHelpers.WriteProperty(writer, this.startDateName, memento.StartDate, options);
+                ConverterHelpers.WriteProperty(writer, this.ownerName, memento.Owner, options);
+                ConverterHelpers.WriteProperty(writer, this.itemsName, memento.Items ?? ImmutableDictionary<Guid, ToDoItemMemento>.Empty, options);
                 writer.WriteEndObject();
             }
 
-            private DateTimeOffset ReadDateTimeOffsetProperty(ref Utf8JsonReader reader, JsonSerializerOptions options)
+            private (ImmutableDictionary<Guid, ToDoItemMemento> items, string owner, DateTimeOffset startDate) ReadProperty(ref Utf8JsonReader reader, JsonSerializerOptions options, (ImmutableDictionary<Guid, ToDoItemMemento> items, string owner, DateTimeOffset startDate) result)
             {
-                Debug.Assert(reader.TokenType == JsonTokenType.PropertyName, "Unexpected token type while trying to read a Guid property.");
-
-                if (!(options?.GetConverter(typeof(DateTimeOffset)) is JsonConverter<DateTimeOffset> dateTimeOffsetConverter))
-                {
-                    throw new InvalidOperationException();
-                }
-
                 reader.Read();
-                return dateTimeOffsetConverter.Read(ref reader, typeof(DateTimeOffset), options);
-            }
-
-            private void WriteDateTimeOffsetProperty(Utf8JsonWriter writer, JsonEncodedText name, DateTimeOffset dateTimeOffsetValue, JsonSerializerOptions options)
-            {
-                if (!(options?.GetConverter(typeof(DateTimeOffset)) is JsonConverter<DateTimeOffset> dateTimeOffsetConverter))
+                if (reader.TokenType != JsonTokenType.PropertyName)
                 {
-                    throw new InvalidOperationException();
+                    throw new JsonException();
                 }
 
-                writer.WritePropertyName(name);
-                dateTimeOffsetConverter.Write(writer, dateTimeOffsetValue, options);
-            }
-
-            private ImmutableDictionary<Guid, ToDoItemMemento> ReadImmutableDictionaryProperty(ref Utf8JsonReader reader, JsonSerializerOptions options)
-            {
-                Debug.Assert(reader.TokenType == JsonTokenType.PropertyName, "Unexpected token type while trying to read an ImmutableDictionary<Guid, ToDoItemMemento> property.");
-
-                if (!(options?.GetConverter(typeof(ImmutableDictionary<Guid, ToDoItemMemento>)) is JsonConverter<ImmutableDictionary<Guid, ToDoItemMemento>> immutableDictionaryConverter))
+                if (reader.ValueTextEquals(this.itemsName.EncodedUtf8Bytes))
                 {
-                    throw new InvalidOperationException();
+                    return (ConverterHelpers.ReadProperty<ImmutableDictionary<Guid, ToDoItemMemento>>(ref reader, options), result.owner, result.startDate);
                 }
-
-                reader.Read();
-                return immutableDictionaryConverter.Read(ref reader, typeof(ImmutableDictionary<Guid, ToDoItemMemento>), options);
-            }
-
-            private void WriteImmutableDictionaryProperty(Utf8JsonWriter writer, JsonEncodedText name, ImmutableDictionary<Guid, ToDoItemMemento> immutableDictionaryValue, JsonSerializerOptions options)
-            {
-                if (!(options?.GetConverter(typeof(ImmutableDictionary<Guid, ToDoItemMemento>)) is JsonConverter<ImmutableDictionary<Guid, ToDoItemMemento>> immutableDictionaryConverter))
+                else if (reader.ValueTextEquals(this.ownerName.EncodedUtf8Bytes))
                 {
-                    throw new InvalidOperationException();
+                    return (result.items, ConverterHelpers.ReadProperty<string>(ref reader, options), result.startDate);
                 }
-
-                writer.WritePropertyName(name);
-                immutableDictionaryConverter.Write(writer, immutableDictionaryValue, options);
-            }
-
-            private string ReadStringProperty(ref Utf8JsonReader reader, JsonSerializerOptions options)
-            {
-                Debug.Assert(reader.TokenType == JsonTokenType.PropertyName, "Unexpected token type while trying to read a string property.");
-
-                if (!(options?.GetConverter(typeof(string)) is JsonConverter<string> stringConverter))
+                else if (reader.ValueTextEquals(this.startDateName.EncodedUtf8Bytes))
                 {
-                    throw new InvalidOperationException();
+                    return (result.items, result.owner, ConverterHelpers.ReadProperty<DateTimeOffset>(ref reader, options));
                 }
-
-                reader.Read();
-                return stringConverter.Read(ref reader, typeof(string), options);
-            }
-
-            private void WriteStringProperty(Utf8JsonWriter writer, JsonEncodedText name, string stringValue, JsonSerializerOptions options)
-            {
-                if (!(options?.GetConverter(typeof(string)) is JsonConverter<string> stringConverter))
+                else
                 {
-                    throw new InvalidOperationException();
+                    throw new JsonException();
                 }
-
-                writer.WritePropertyName(name);
-                stringConverter.Write(writer, stringValue, options);
             }
         }
     }

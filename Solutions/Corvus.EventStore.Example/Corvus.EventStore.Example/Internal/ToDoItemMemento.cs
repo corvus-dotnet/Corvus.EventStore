@@ -5,9 +5,9 @@
 namespace Corvus.EventStore.Example.Internal
 {
     using System;
-    using System.Diagnostics;
     using System.Text.Json;
     using System.Text.Json.Serialization;
+    using Corvus.EventStore.Serialization.Json.Converters;
 
     /// <summary>
     /// An item in the list maintained by the <see cref="ToDoListMemento"/>.
@@ -60,104 +60,16 @@ namespace Corvus.EventStore.Example.Internal
                     throw new JsonException();
                 }
 
-                Guid id = default;
-                bool idSet = false;
+                (Guid id, string title, string description) = (default, string.Empty, string.Empty);
 
-                string title = string.Empty;
-                bool titleSet = false;
-
-                string description = string.Empty;
-                bool descriptionSet = false;
-
-                // Get the first property.
-                reader.Read();
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    throw new JsonException();
-                }
-
-                if (reader.ValueTextEquals(this.idName.EncodedUtf8Bytes))
-                {
-                    id = this.ReadGuidProperty(ref reader, options);
-                    idSet = true;
-                }
-                else if (reader.ValueTextEquals(this.titleName.EncodedUtf8Bytes))
-                {
-                    title = this.ReadStringProperty(ref reader, options);
-                    titleSet = true;
-                }
-                else if (reader.ValueTextEquals(this.descriptionName.EncodedUtf8Bytes))
-                {
-                    description = this.ReadStringProperty(ref reader, options);
-                    descriptionSet = true;
-                }
-                else
-                {
-                    throw new JsonException();
-                }
-
-                // Get the second property.
-                reader.Read();
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    throw new JsonException();
-                }
-
-                if (reader.ValueTextEquals(this.idName.EncodedUtf8Bytes))
-                {
-                    id = this.ReadGuidProperty(ref reader, options);
-                    idSet = true;
-                }
-                else if (reader.ValueTextEquals(this.titleName.EncodedUtf8Bytes))
-                {
-                    title = this.ReadStringProperty(ref reader, options);
-                    titleSet = true;
-                }
-                else if (reader.ValueTextEquals(this.descriptionName.EncodedUtf8Bytes))
-                {
-                    description = this.ReadStringProperty(ref reader, options);
-                    descriptionSet = true;
-                }
-                else
-                {
-                    throw new JsonException();
-                }
-
-                // Get the third property.
-                reader.Read();
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    throw new JsonException();
-                }
-
-                if (reader.ValueTextEquals(this.idName.EncodedUtf8Bytes))
-                {
-                    id = this.ReadGuidProperty(ref reader, options);
-                    idSet = true;
-                }
-                else if (reader.ValueTextEquals(this.titleName.EncodedUtf8Bytes))
-                {
-                    title = this.ReadStringProperty(ref reader, options);
-                    titleSet = true;
-                }
-                else if (reader.ValueTextEquals(this.descriptionName.EncodedUtf8Bytes))
-                {
-                    description = this.ReadStringProperty(ref reader, options);
-                    descriptionSet = true;
-                }
-                else
-                {
-                    throw new JsonException();
-                }
+                // Read each of the three properties.
+                (id, title, description) = this.ReadProperty(ref reader, options, (id, title, description));
+                (id, title, description) = this.ReadProperty(ref reader, options, (id, title, description));
+                (id, title, description) = this.ReadProperty(ref reader, options, (id, title, description));
 
                 reader.Read();
 
                 if (reader.TokenType != JsonTokenType.EndObject)
-                {
-                    throw new JsonException();
-                }
-
-                if (!(idSet && titleSet && descriptionSet))
                 {
                     throw new JsonException();
                 }
@@ -172,58 +84,36 @@ namespace Corvus.EventStore.Example.Internal
                 JsonSerializerOptions options)
             {
                 writer.WriteStartObject();
-                this.WriteGuidProperty(writer, this.idName, payload.Id, options);
-                this.WriteStringProperty(writer, this.titleName, payload.Title, options);
-                this.WriteStringProperty(writer, this.descriptionName, payload.Description, options);
+                ConverterHelpers.WriteProperty(writer, this.idName, payload.Id, options);
+                ConverterHelpers.WriteProperty(writer, this.titleName, payload.Title, options);
+                ConverterHelpers.WriteProperty(writer, this.descriptionName, payload.Description, options);
                 writer.WriteEndObject();
             }
 
-            private Guid ReadGuidProperty(ref Utf8JsonReader reader, JsonSerializerOptions options)
+            private (Guid id, string title, string description) ReadProperty(ref Utf8JsonReader reader, JsonSerializerOptions options, (Guid id, string title, string description) result)
             {
-                Debug.Assert(reader.TokenType == JsonTokenType.PropertyName, "Unexpected token type while trying to read a Guid property.");
-
-                if (!(options?.GetConverter(typeof(Guid)) is JsonConverter<Guid> guidConverter))
-                {
-                    throw new InvalidOperationException();
-                }
-
                 reader.Read();
-                return guidConverter.Read(ref reader, typeof(Guid), options);
-            }
-
-            private void WriteGuidProperty(Utf8JsonWriter writer, JsonEncodedText name, Guid guidValue, JsonSerializerOptions options)
-            {
-                if (!(options?.GetConverter(typeof(Guid)) is JsonConverter<Guid> guidConverter))
+                if (reader.TokenType != JsonTokenType.PropertyName)
                 {
-                    throw new InvalidOperationException();
+                    throw new JsonException();
                 }
 
-                writer.WritePropertyName(name);
-                guidConverter.Write(writer, guidValue, options);
-            }
-
-            private string ReadStringProperty(ref Utf8JsonReader reader, JsonSerializerOptions options)
-            {
-                Debug.Assert(reader.TokenType == JsonTokenType.PropertyName, "Unexpected token type while trying to read a string property.");
-
-                if (!(options?.GetConverter(typeof(string)) is JsonConverter<string> stringConverter))
+                if (reader.ValueTextEquals(this.idName.EncodedUtf8Bytes))
                 {
-                    throw new InvalidOperationException();
+                    return (ConverterHelpers.ReadProperty<Guid>(ref reader, options), result.title, result.description);
                 }
-
-                reader.Read();
-                return stringConverter.Read(ref reader, typeof(string), options);
-            }
-
-            private void WriteStringProperty(Utf8JsonWriter writer, JsonEncodedText name, string stringValue, JsonSerializerOptions options)
-            {
-                if (!(options?.GetConverter(typeof(string)) is JsonConverter<string> stringConverter))
+                else if (reader.ValueTextEquals(this.titleName.EncodedUtf8Bytes))
                 {
-                    throw new InvalidOperationException();
+                    return (result.id, ConverterHelpers.ReadProperty<string>(ref reader, options), result.description);
                 }
-
-                writer.WritePropertyName(name);
-                stringConverter.Write(writer, stringValue, options);
+                else if (reader.ValueTextEquals(this.descriptionName.EncodedUtf8Bytes))
+                {
+                    return (result.id, result.title, ConverterHelpers.ReadProperty<string>(ref reader, options));
+                }
+                else
+                {
+                    throw new JsonException();
+                }
             }
         }
     }

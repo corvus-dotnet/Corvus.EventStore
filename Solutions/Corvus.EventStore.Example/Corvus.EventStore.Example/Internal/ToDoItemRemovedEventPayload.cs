@@ -5,9 +5,9 @@
 namespace Corvus.EventStore.Example.Internal
 {
     using System;
-    using System.Diagnostics;
     using System.Text.Json;
     using System.Text.Json.Serialization;
+    using Corvus.EventStore.Serialization.Json.Converters;
 
     /// <summary>
     /// An event payload for when a to do item is removed from a todolist.
@@ -49,34 +49,11 @@ namespace Corvus.EventStore.Example.Internal
                     throw new JsonException();
                 }
 
-                // Get the first property.
-                reader.Read();
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    throw new JsonException();
-                }
-
-                Guid toDoItemId;
-                bool toDoItemIdSet;
-
-                if (reader.ValueTextEquals(this.toDoItemIdName.EncodedUtf8Bytes))
-                {
-                    toDoItemId = this.ReadGuidProperty(ref reader, options);
-                    toDoItemIdSet = true;
-                }
-                else
-                {
-                    throw new JsonException();
-                }
+                Guid toDoItemId = this.ReadProperty(ref reader, options);
 
                 reader.Read();
 
                 if (reader.TokenType != JsonTokenType.EndObject)
-                {
-                    throw new JsonException();
-                }
-
-                if (!toDoItemIdSet)
                 {
                     throw new JsonException();
                 }
@@ -91,33 +68,27 @@ namespace Corvus.EventStore.Example.Internal
                 JsonSerializerOptions options)
             {
                 writer.WriteStartObject();
-                this.WriteGuidProperty(writer, this.toDoItemIdName, payload.ToDoItemId, options);
+                ConverterHelpers.WriteProperty(writer, this.toDoItemIdName, payload.ToDoItemId, options);
                 writer.WriteEndObject();
             }
 
-            private Guid ReadGuidProperty(ref Utf8JsonReader reader, JsonSerializerOptions options)
+            private Guid ReadProperty(ref Utf8JsonReader reader, JsonSerializerOptions options)
             {
-                Debug.Assert(reader.TokenType == JsonTokenType.PropertyName, "Unexpected token type while trying to read a Guid property.");
-
-                if (!(options?.GetConverter(typeof(Guid)) is JsonConverter<Guid> guidConverter))
-                {
-                    throw new InvalidOperationException();
-                }
-
                 reader.Read();
-                return guidConverter.Read(ref reader, typeof(Guid), options);
-            }
 
-            private void WriteGuidProperty(Utf8JsonWriter writer, JsonEncodedText name, Guid guidValue, JsonSerializerOptions options)
-            {
-                writer.WritePropertyName(name);
-
-                if (!(options?.GetConverter(typeof(Guid)) is JsonConverter<Guid> guidConverter))
+                if (reader.TokenType != JsonTokenType.PropertyName)
                 {
-                    throw new InvalidOperationException();
+                    throw new JsonException();
                 }
 
-                guidConverter.Write(writer, guidValue, options);
+                if (reader.ValueTextEquals(this.toDoItemIdName.EncodedUtf8Bytes))
+                {
+                    return ConverterHelpers.ReadProperty<Guid>(ref reader, options);
+                }
+                else
+                {
+                    throw new JsonException();
+                }
             }
         }
     }

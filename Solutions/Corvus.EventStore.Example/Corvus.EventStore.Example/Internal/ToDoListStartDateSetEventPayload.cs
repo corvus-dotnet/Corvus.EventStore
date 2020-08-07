@@ -5,9 +5,9 @@
 namespace Corvus.EventStore.Example.Internal
 {
     using System;
-    using System.Diagnostics;
     using System.Text.Json;
     using System.Text.Json.Serialization;
+    using Corvus.EventStore.Serialization.Json.Converters;
 
     /// <summary>
     /// An event payload for when the start date of the todo list is set.
@@ -52,34 +52,11 @@ namespace Corvus.EventStore.Example.Internal
                     throw new JsonException();
                 }
 
-                // Get the first property.
-                reader.Read();
-                if (reader.TokenType != JsonTokenType.PropertyName)
-                {
-                    throw new JsonException();
-                }
-
-                DateTimeOffset startDate;
-                bool startDateSet;
-
-                if (reader.ValueTextEquals(this.startDateName.EncodedUtf8Bytes))
-                {
-                    startDate = this.ReadDateTimeOffsetProperty(ref reader, options);
-                    startDateSet = true;
-                }
-                else
-                {
-                    throw new JsonException();
-                }
+                DateTimeOffset startDate = this.ReadProperty(ref reader, options);
 
                 reader.Read();
 
                 if (reader.TokenType != JsonTokenType.EndObject)
-                {
-                    throw new JsonException();
-                }
-
-                if (!startDateSet)
                 {
                     throw new JsonException();
                 }
@@ -94,32 +71,26 @@ namespace Corvus.EventStore.Example.Internal
                 JsonSerializerOptions options)
             {
                 writer.WriteStartObject();
-                this.WriteDateTimeOffsetProperty(writer, this.startDateName, payload.StartDate, options);
+                ConverterHelpers.WriteProperty(writer, this.startDateName, payload.StartDate, options);
                 writer.WriteEndObject();
             }
 
-            private DateTimeOffset ReadDateTimeOffsetProperty(ref Utf8JsonReader reader, JsonSerializerOptions options)
+            private DateTimeOffset ReadProperty(ref Utf8JsonReader reader, JsonSerializerOptions options)
             {
-                if (!(options?.GetConverter(typeof(DateTimeOffset)) is JsonConverter<DateTimeOffset> dateTimeOffsetConverter))
-                {
-                    throw new InvalidOperationException();
-                }
-
-                Debug.Assert(reader.TokenType == JsonTokenType.PropertyName, "Unexpected token type while trying to read a string property.");
-
                 reader.Read();
-                return dateTimeOffsetConverter.Read(ref reader, typeof(DateTimeOffset), options);
-            }
-
-            private void WriteDateTimeOffsetProperty(Utf8JsonWriter writer, JsonEncodedText name, DateTimeOffset dateTimeOffsetValue, JsonSerializerOptions options)
-            {
-                if (!(options?.GetConverter(typeof(DateTimeOffset)) is JsonConverter<DateTimeOffset> dateTimeOffsetConverter))
+                if (reader.TokenType != JsonTokenType.PropertyName)
                 {
-                    throw new InvalidOperationException();
+                    throw new JsonException();
                 }
 
-                writer.WritePropertyName(name);
-                dateTimeOffsetConverter.Write(writer, dateTimeOffsetValue, options);
+                if (reader.ValueTextEquals(this.startDateName.EncodedUtf8Bytes))
+                {
+                    return ConverterHelpers.ReadProperty<DateTimeOffset>(ref reader, options);
+                }
+                else
+                {
+                    throw new JsonException();
+                }
             }
         }
     }
