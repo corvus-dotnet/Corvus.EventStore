@@ -8,6 +8,7 @@ namespace Corvus.EventStore.Example.Internal
     using System.Collections.Immutable;
     using System.Text.Json;
     using System.Text.Json.Serialization;
+    using Corvus.EventStore.Example.Internal.Events;
     using Corvus.EventStore.Serialization.Json.Converters;
 
     /// <summary>

@@ -2,7 +2,7 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.Example.Internal
+namespace Corvus.EventStore.Example.Internal.Events
 {
     using System;
     using System.Text.Json;

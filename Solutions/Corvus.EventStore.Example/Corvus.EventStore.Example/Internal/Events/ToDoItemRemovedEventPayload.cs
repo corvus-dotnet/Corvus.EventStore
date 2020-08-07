@@ -1,8 +1,8 @@
-﻿// <copyright file="ToDoListOwnerSetEventPayload.cs" company="Endjin Limited">
+﻿// <copyright file="ToDoItemRemovedEventPayload.cs" company="Endjin Limited">
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.Example.Internal
+namespace Corvus.EventStore.Example.Internal.Events
 {
     using System;
     using System.Text.Json;
@@ -10,36 +10,36 @@ namespace Corvus.EventStore.Example.Internal
     using Corvus.EventStore.Serialization.Json.Converters;
 
     /// <summary>
-    /// An event payload for when the owner of the todo list is set.
+    /// An event payload for when a to do item is removed from a todolist.
     /// </summary>
     [JsonConverter(typeof(Converter))]
-    internal readonly struct ToDoListOwnerSetEventPayload
+    internal readonly struct ToDoItemRemovedEventPayload
     {
         /// <summary>
-        /// The unique event type of this event.
+        /// The unique event type.
         /// </summary>
-        public const string EventType = "corvus.event-store-example.to-do-list-owner-set";
+        public const string EventType = "corvus.event-store-example.to-do-item-removed";
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ToDoItemAddedEventPayload"/> struct.
+        /// Initializes a new instance of the <see cref="ToDoItemRemovedEventPayload"/> struct.
         /// </summary>
-        /// <param name="owner">The <see cref="Owner"/>.</param>
-        public ToDoListOwnerSetEventPayload(string owner)
+        /// <param name="id">The <see cref="ToDoItemId"/> of the item that was removed.</param>
+        public ToDoItemRemovedEventPayload(Guid id)
         {
-            this.Owner = owner;
+            this.ToDoItemId = id;
         }
 
         /// <summary>
-        /// Gets the owner.
+        /// Gets the id of the item that was removed.
         /// </summary>
-        public string Owner { get; }
+        public Guid ToDoItemId { get; }
 
-        private class Converter : JsonConverter<ToDoListOwnerSetEventPayload>
+        private class Converter : JsonConverter<ToDoItemRemovedEventPayload>
         {
-            private readonly JsonEncodedText ownerName = JsonEncodedText.Encode("Owner");
+            private readonly JsonEncodedText toDoItemIdName = JsonEncodedText.Encode("ToDoItemId");
 
             /// <inheritdoc/>
-            public override ToDoListOwnerSetEventPayload Read(
+            public override ToDoItemRemovedEventPayload Read(
                 ref Utf8JsonReader reader,
                 Type typeToConvert,
                 JsonSerializerOptions options)
@@ -49,7 +49,7 @@ namespace Corvus.EventStore.Example.Internal
                     throw new JsonException();
                 }
 
-                string owner = this.ReadProperty(ref reader, options);
+                Guid toDoItemId = this.ReadProperty(ref reader, options);
 
                 reader.Read();
 
@@ -58,31 +58,32 @@ namespace Corvus.EventStore.Example.Internal
                     throw new JsonException();
                 }
 
-                return new ToDoListOwnerSetEventPayload(owner);
+                return new ToDoItemRemovedEventPayload(toDoItemId);
             }
 
             /// <inheritdoc/>
             public override void Write(
                 Utf8JsonWriter writer,
-                ToDoListOwnerSetEventPayload payload,
+                ToDoItemRemovedEventPayload payload,
                 JsonSerializerOptions options)
             {
                 writer.WriteStartObject();
-                ConverterHelpers.WriteProperty(writer, this.ownerName, payload.Owner, options);
+                ConverterHelpers.WriteProperty(writer, this.toDoItemIdName, payload.ToDoItemId, options);
                 writer.WriteEndObject();
             }
 
-            private string ReadProperty(ref Utf8JsonReader reader, JsonSerializerOptions options)
+            private Guid ReadProperty(ref Utf8JsonReader reader, JsonSerializerOptions options)
             {
                 reader.Read();
+
                 if (reader.TokenType != JsonTokenType.PropertyName)
                 {
                     throw new JsonException();
                 }
 
-                if (reader.ValueTextEquals(this.ownerName.EncodedUtf8Bytes))
+                if (reader.ValueTextEquals(this.toDoItemIdName.EncodedUtf8Bytes))
                 {
-                    return ConverterHelpers.ReadProperty<string>(ref reader, options);
+                    return ConverterHelpers.ReadProperty<Guid>(ref reader, options);
                 }
                 else
                 {

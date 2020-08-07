@@ -9,6 +9,7 @@ namespace Corvus.EventStore.Example
     using Corvus.EventStore.Aggregates;
     using Corvus.EventStore.Core;
     using Corvus.EventStore.Example.Internal;
+    using Corvus.EventStore.Example.Internal.Events;
 
     /// <summary>
     /// A to do list backed by an aggregate root.
@@ -18,9 +19,9 @@ namespace Corvus.EventStore.Example
         // We tune this based on our item event size
         private const int MaxItemsPerBatch = 100;
 
-        private readonly AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate;
+        private readonly AggregateWithMemento<ToDoListEventHandler, ToDoListMemento> aggregate;
 
-        private ToDoList(AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate)
+        private ToDoList(AggregateWithMemento<ToDoListEventHandler, ToDoListMemento> aggregate)
         {
             this.aggregate = aggregate;
         }
@@ -37,7 +38,7 @@ namespace Corvus.EventStore.Example
         public static async ValueTask<ToDoList> ReadAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue)
             where TReader : IAggregateReader
         {
-            AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.ReadAsync(reader, aggregateId, partitionKey, MaxItemsPerBatch, commitSequenceNumber).ConfigureAwait(false);
+            AggregateWithMemento<ToDoListEventHandler, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>.ReadAsync(reader, aggregateId, partitionKey, MaxItemsPerBatch, commitSequenceNumber).ConfigureAwait(false);
             return new ToDoList(aggregate);
         }
 
@@ -152,7 +153,7 @@ namespace Corvus.EventStore.Example
                 await writer.CommitAsync(
                     this.aggregate,
                     DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    NeverSnapshotPolicy<AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>>.Instance).ConfigureAwait(false));
+                    NeverSnapshotPolicy<AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>>.Instance).ConfigureAwait(false));
         }
     }
 }

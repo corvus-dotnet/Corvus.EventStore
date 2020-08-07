@@ -16,10 +16,10 @@ namespace Corvus.EventStore.Aggregates
     /// <summary>
     /// An implementation of an aggregate root that stores its state in an internal memento.
     /// </summary>
-    /// <typeparam name="TImplementation">The type of that implements the memento updates.</typeparam>
+    /// <typeparam name="TEventHandler">The type of that handles the memento updates as events are applied.</typeparam>
     /// <typeparam name="TMemento">The type of the memento.</typeparam>
-    public readonly struct AggregateWithMemento<TImplementation, TMemento> : IAggregateRoot<AggregateWithMemento<TImplementation, TMemento>>
-        where TImplementation : IAggregateImplementationWithMemento<TImplementation, TMemento>, new()
+    public readonly struct AggregateWithMemento<TEventHandler, TMemento> : IAggregateRoot<AggregateWithMemento<TEventHandler, TMemento>>
+        where TEventHandler : IAggregateEventHandler<TEventHandler, TMemento>, new()
         where TMemento : new()
     {
         /// <summary>
@@ -97,7 +97,7 @@ namespace Corvus.EventStore.Aggregates
         /// <param name="maxItemsPerBatch">The optional maximum number of items per batch. The default is 100.</param>
         /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
         /// <returns>A <see cref="ValueTask"/> which completes with the aggregate.</returns>
-        public static ValueTask<AggregateWithMemento<TImplementation, TMemento>> ReadAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, int maxItemsPerBatch = 100, long commitSequenceNumber = long.MaxValue)
+        public static ValueTask<AggregateWithMemento<TEventHandler, TMemento>> ReadAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, int maxItemsPerBatch = 100, long commitSequenceNumber = long.MaxValue)
             where TReader : IAggregateReader
         {
             return reader.ReadAsync(s => CreateFrom(s), aggregateId, partitionKey, maxItemsPerBatch, commitSequenceNumber);
@@ -123,15 +123,15 @@ namespace Corvus.EventStore.Aggregates
         /// This will be called when a new event has been created.
         /// </remarks>
         /// <returns>The aggregate with the event applied.</returns>
-        public AggregateWithMemento<TImplementation, TMemento> ApplyEvent<TPayload>(in Event<TPayload> @event)
+        public AggregateWithMemento<TEventHandler, TMemento> ApplyEvent<TPayload>(in Event<TPayload> @event)
         {
             this.Validate(@event);
 
-            var implementation = new TImplementation();
+            var eventHandler = new TEventHandler();
 
-            TMemento updatedMemento = implementation.ApplyEvent(this.Memento, @event);
+            TMemento updatedMemento = eventHandler.HandleEvent(this.Memento, @event);
             SerializedEvent serializedEvent = EventSerializer.Serialize(@event);
-            return new AggregateWithMemento<TImplementation, TMemento>(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber, this.EventSequenceNumber + 1, this.UncommittedEvents.Add(serializedEvent), updatedMemento);
+            return new AggregateWithMemento<TEventHandler, TMemento>(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber, this.EventSequenceNumber + 1, this.UncommittedEvents.Add(serializedEvent), updatedMemento);
         }
 
         /// <summary>
@@ -142,13 +142,13 @@ namespace Corvus.EventStore.Aggregates
         /// <remarks>
         /// This will be called when the aggregate is being rehydrated from committed events.
         /// </remarks>
-        public AggregateWithMemento<TImplementation, TMemento> ApplyCommits(in IEnumerable<Commit> commits)
+        public AggregateWithMemento<TEventHandler, TMemento> ApplyCommits(in IEnumerable<Commit> commits)
         {
             commits.ValidateCommits(this.AggregateId, this.CommitSequenceNumber, this.EventSequenceNumber);
 
             TMemento memento = this.Memento;
 
-            var implementation = new TImplementation();
+            var eventHandler = new TEventHandler();
 
             int eventCount = 0;
             int commitCount = 0;
@@ -157,14 +157,14 @@ namespace Corvus.EventStore.Aggregates
             {
                 foreach (SerializedEvent @event in commit.Events)
                 {
-                    memento = implementation.ApplySerializedEvent(memento, @event);
+                    memento = eventHandler.HandleSerializedEvent(memento, @event);
                     eventCount += 1;
                 }
 
                 commitCount += 1;
             }
 
-            return new AggregateWithMemento<TImplementation, TMemento>(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber + commitCount, this.EventSequenceNumber + eventCount, this.UncommittedEvents, memento);
+            return new AggregateWithMemento<TEventHandler, TMemento>(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber + commitCount, this.EventSequenceNumber + eventCount, this.UncommittedEvents, memento);
         }
 
         /// <summary>
@@ -173,7 +173,7 @@ namespace Corvus.EventStore.Aggregates
         /// <typeparam name="TEventWriter">The type of event writer to use.</typeparam>
         /// <param name="writer">The event writer to use to store new events.</param>
         /// <returns>The aggregate with all new events committed.</returns>
-        public async ValueTask<AggregateWithMemento<TImplementation, TMemento>> CommitAsync<TEventWriter>(TEventWriter writer)
+        public async ValueTask<AggregateWithMemento<TEventHandler, TMemento>> CommitAsync<TEventWriter>(TEventWriter writer)
             where TEventWriter : IEventWriter
         {
             if (this.UncommittedEvents.Length == 0)
@@ -182,7 +182,7 @@ namespace Corvus.EventStore.Aggregates
             }
 
             await writer.WriteCommitAsync(new Commit(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber + 1, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), this.UncommittedEvents)).ConfigureAwait(false);
-            return new AggregateWithMemento<TImplementation, TMemento>(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber + 1, this.EventSequenceNumber, ImmutableArray<SerializedEvent>.Empty, this.Memento);
+            return new AggregateWithMemento<TEventHandler, TMemento>(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber + 1, this.EventSequenceNumber, ImmutableArray<SerializedEvent>.Empty, this.Memento);
         }
 
         /// <summary>
@@ -203,14 +203,14 @@ namespace Corvus.EventStore.Aggregates
         /// </summary>
         /// <param name="snapshot">The <see cref="SerializedSnapshot"/> from which to create the state.</param>
         /// <returns>The state with the snapshot applied.</returns>
-        private static AggregateWithMemento<TImplementation, TMemento> CreateFrom(SerializedSnapshot snapshot)
+        private static AggregateWithMemento<TEventHandler, TMemento> CreateFrom(SerializedSnapshot snapshot)
         {
             if (snapshot.IsEmpty)
             {
-                return new AggregateWithMemento<TImplementation, TMemento>(snapshot.AggregateId, snapshot.PartitionKey, -1, -1, ImmutableArray<SerializedEvent>.Empty, new TMemento());
+                return new AggregateWithMemento<TEventHandler, TMemento>(snapshot.AggregateId, snapshot.PartitionKey, -1, -1, ImmutableArray<SerializedEvent>.Empty, new TMemento());
             }
 
-            return new AggregateWithMemento<TImplementation, TMemento>(
+            return new AggregateWithMemento<TEventHandler, TMemento>(
                 snapshot.AggregateId,
                 snapshot.PartitionKey,
                 snapshot.CommitSequenceNumber,

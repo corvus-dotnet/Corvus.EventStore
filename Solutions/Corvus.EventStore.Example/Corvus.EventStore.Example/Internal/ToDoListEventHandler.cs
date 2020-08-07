@@ -1,4 +1,4 @@
-﻿// <copyright file="ToDoListAggregateImplementation.cs" company="Endjin Limited">
+﻿// <copyright file="ToDoListEventHandler.cs" company="Endjin Limited">
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
@@ -8,14 +8,15 @@ namespace Corvus.EventStore.Example
     using Corvus.EventStore.Aggregates;
     using Corvus.EventStore.Core;
     using Corvus.EventStore.Example.Internal;
+    using Corvus.EventStore.Example.Internal.Events;
 
     /// <summary>
     /// The aggregate root for a ToDo list containing ToDo items.
     /// </summary>
-    internal readonly struct ToDoListAggregateImplementation : IAggregateImplementationWithMemento<ToDoListAggregateImplementation, ToDoListMemento>
+    internal readonly struct ToDoListEventHandler : IAggregateEventHandler<ToDoListEventHandler, ToDoListMemento>
     {
         /// <inheritdoc/>
-        public ToDoListMemento ApplyEvent<TPayload>(in ToDoListMemento memento, in Event<TPayload> @event)
+        public ToDoListMemento HandleEvent<TPayload>(in ToDoListMemento memento, in Event<TPayload> @event)
         {
             return @event switch
             {
@@ -28,7 +29,7 @@ namespace Corvus.EventStore.Example
         }
 
         /// <inheritdoc/>
-        public ToDoListMemento ApplySerializedEvent(in ToDoListMemento memento, in SerializedEvent @event)
+        public ToDoListMemento HandleSerializedEvent(in ToDoListMemento memento, in SerializedEvent @event)
         {
             return @event.EventType switch
             {
@@ -42,22 +43,22 @@ namespace Corvus.EventStore.Example
 
         private ToDoListMemento HandleToDoItemAdded(in ToDoListMemento memento, in SerializedEvent @event)
         {
-            return memento.With(AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Deserialize<ToDoItemAddedEventPayload>(@event).Payload);
+            return memento.With(AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>.Deserialize<ToDoItemAddedEventPayload>(@event).Payload);
         }
 
         private ToDoListMemento HandleToDoItemRemoved(in ToDoListMemento memento, in SerializedEvent @event)
         {
-            return memento.With(AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Deserialize<ToDoItemRemovedEventPayload>(@event).Payload);
+            return memento.With(AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>.Deserialize<ToDoItemRemovedEventPayload>(@event).Payload);
         }
 
         private ToDoListMemento HandleOwnerSet(in ToDoListMemento memento, in SerializedEvent @event)
         {
-            return memento.With(AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Deserialize<ToDoListOwnerSetEventPayload>(@event).Payload);
+            return memento.With(AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>.Deserialize<ToDoListOwnerSetEventPayload>(@event).Payload);
         }
 
         private ToDoListMemento HandleStartDateSet(in ToDoListMemento memento, in SerializedEvent @event)
         {
-            return memento.With(AggregateWithMemento<ToDoListAggregateImplementation, ToDoListMemento>.Deserialize<ToDoListStartDateSetEventPayload>(@event).Payload);
+            return memento.With(AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>.Deserialize<ToDoListStartDateSetEventPayload>(@event).Payload);
         }
     }
 }
