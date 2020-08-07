@@ -53,6 +53,7 @@ namespace Corvus.EventStore.Serialization.Json
         {
             var options = new JsonSerializerOptions();
             options.Converters.Add(new ImmutableDictionaryTKeyTValueConverter());
+            options.Converters.Add(new ImmutableArrayTValueConverter());
             return options;
         }
     }

@@ -101,7 +101,7 @@ namespace Corvus.EventStore.Example
         /// <returns>A <see cref="ToDoList"/> with the start date updated.</returns>
         public ToDoList AddToDoItem(Guid id, string title, string description)
         {
-            if (this.aggregate.Memento.Items.ContainsKey(id))
+            if (this.aggregate.Memento.ItemIds.Contains(id))
             {
                 throw new InvalidOperationException($"The item with id {id} has already been added.");
             }
@@ -124,7 +124,7 @@ namespace Corvus.EventStore.Example
         /// <returns>A <see cref="ToDoList"/> with the start date updated.</returns>
         public ToDoList RemoveToDoItem(Guid id)
         {
-            if (!this.aggregate.Memento.Items.ContainsKey(id))
+            if (!this.aggregate.Memento.ItemIds.Contains(id))
             {
                 throw new InvalidOperationException($"The item with id {id} does not exist.");
             }
@@ -154,7 +154,7 @@ namespace Corvus.EventStore.Example
                 await writer.CommitAsync(
                     this.aggregate,
                     DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                    NeverSnapshotPolicy<AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>>.Instance).ConfigureAwait(false));
+                    AlwaysSnapshotPolicy<AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>>.Instance).ConfigureAwait(false));
         }
     }
 }

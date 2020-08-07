@@ -20,20 +20,21 @@ namespace Corvus.EventStore.Example.Internal.Mementos
         /// <summary>
         /// Initializes a new instance of the <see cref="ToDoListMemento"/> struct.
         /// </summary>
-        /// <param name="items">The <see cref="Items"/>.</param>
+        /// <param name="itemIds">The <see cref="ItemIds"/>.</param>
         /// <param name="owner">The <see cref="Owner"/>.</param>
         /// <param name="startDate">The <see cref="StartDate"/>.</param>
-        public ToDoListMemento(ImmutableDictionary<Guid, ToDoItemMemento> items, string owner, DateTimeOffset startDate)
+        public ToDoListMemento(ImmutableArray<Guid> itemIds, string owner, DateTimeOffset startDate)
         {
-            this.Items = items;
+            this.ItemIds = itemIds;
             this.Owner = owner;
             this.StartDate = startDate;
         }
 
         /// <summary>
-        /// Gets the array of to-do items currently in the list.
+        /// Gets the array of IDs of the to-do items currently in the list.
         /// </summary>
-        public ImmutableDictionary<Guid, ToDoItemMemento> Items { get; }
+        /// <remarks>This illustrates that the memento only needs enough state for the domain logic to do its job.</remarks>
+        public ImmutableArray<Guid> ItemIds { get; }
 
         /// <summary>
         /// Gets the owner of the list.
@@ -53,7 +54,7 @@ namespace Corvus.EventStore.Example.Internal.Mementos
         /// <returns>A <see cref="ToDoListMemento"/> with the item added.</returns>
         public ToDoListMemento With(ToDoItemAddedEventPayload payload)
         {
-            return new ToDoListMemento(this.GetOrCreateItems().Add(payload.ToDoItemId, new ToDoItemMemento(payload.ToDoItemId, payload.Title, payload.Description)), this.Owner, this.StartDate);
+            return new ToDoListMemento(this.GetOrCreateItems().Add(payload.ToDoItemId), this.Owner, this.StartDate);
         }
 
         /// <summary>
@@ -86,9 +87,9 @@ namespace Corvus.EventStore.Example.Internal.Mementos
             return new ToDoListMemento(this.GetOrCreateItems(), this.Owner, payload.StartDate);
         }
 
-        private ImmutableDictionary<Guid, ToDoItemMemento> GetOrCreateItems()
+        private ImmutableArray<Guid> GetOrCreateItems()
         {
-            return this.Items ?? ImmutableDictionary<Guid, ToDoItemMemento>.Empty;
+            return this.ItemIds.IsDefault ? ImmutableArray<Guid>.Empty : this.ItemIds;
         }
 
         private class Converter : JsonConverter<ToDoListMemento>
@@ -108,8 +109,8 @@ namespace Corvus.EventStore.Example.Internal.Mementos
                     throw new JsonException();
                 }
 
-                (ImmutableDictionary<Guid, ToDoItemMemento> items, string owner, DateTimeOffset startDate) =
-                    (ImmutableDictionary<Guid, ToDoItemMemento>.Empty, string.Empty, default);
+                (ImmutableArray<Guid> items, string owner, DateTimeOffset startDate) =
+                    (ImmutableArray<Guid>.Empty, string.Empty, default);
 
                 (items, owner, startDate) = this.ReadProperty(ref reader, options, (items, owner, startDate));
                 (items, owner, startDate) = this.ReadProperty(ref reader, options, (items, owner, startDate));
@@ -134,11 +135,11 @@ namespace Corvus.EventStore.Example.Internal.Mementos
                 writer.WriteStartObject();
                 ConverterHelpers.WriteProperty(writer, this.startDateName, memento.StartDate, options);
                 ConverterHelpers.WriteProperty(writer, this.ownerName, memento.Owner, options);
-                ConverterHelpers.WriteProperty(writer, this.itemsName, memento.Items ?? ImmutableDictionary<Guid, ToDoItemMemento>.Empty, options);
+                ConverterHelpers.WriteProperty(writer, this.itemsName, memento.ItemIds, options);
                 writer.WriteEndObject();
             }
 
-            private (ImmutableDictionary<Guid, ToDoItemMemento> items, string owner, DateTimeOffset startDate) ReadProperty(ref Utf8JsonReader reader, JsonSerializerOptions options, (ImmutableDictionary<Guid, ToDoItemMemento> items, string owner, DateTimeOffset startDate) result)
+            private (ImmutableArray<Guid> items, string owner, DateTimeOffset startDate) ReadProperty(ref Utf8JsonReader reader, JsonSerializerOptions options, (ImmutableArray<Guid> items, string owner, DateTimeOffset startDate) result)
             {
                 reader.Read();
                 if (reader.TokenType != JsonTokenType.PropertyName)
@@ -148,7 +149,7 @@ namespace Corvus.EventStore.Example.Internal.Mementos
 
                 if (reader.ValueTextEquals(this.itemsName.EncodedUtf8Bytes))
                 {
-                    return (ConverterHelpers.ReadProperty<ImmutableDictionary<Guid, ToDoItemMemento>>(ref reader, options), result.owner, result.startDate);
+                    return (ConverterHelpers.ReadProperty<ImmutableArray<Guid>>(ref reader, options), result.owner, result.startDate);
                 }
                 else if (reader.ValueTextEquals(this.ownerName.EncodedUtf8Bytes))
                 {
