@@ -101,7 +101,7 @@ namespace Corvus.EventStore.Example
         {
             if (this.aggregate.Memento.Items.ContainsKey(id))
             {
-                throw new InvalidOperationException($"The item with id {id} has already been added");
+                throw new InvalidOperationException($"The item with id {id} has already been added.");
             }
 
             // Apply an event to add an item
@@ -122,6 +122,11 @@ namespace Corvus.EventStore.Example
         /// <returns>A <see cref="ToDoList"/> with the start date updated.</returns>
         public ToDoList RemoveToDoItem(Guid id)
         {
+            if (!this.aggregate.Memento.Items.ContainsKey(id))
+            {
+                throw new InvalidOperationException($"The item with id {id} does not exist.");
+            }
+
             // Apply an event to add an item
             // Then apply an event to set the owner
             return new ToDoList(
