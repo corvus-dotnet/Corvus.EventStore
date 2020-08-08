@@ -8,7 +8,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Snapshots
     using System.Linq;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
-    using Corvus.EventStore.Azure.TableStorage.Core.Internal;
+    using Corvus.EventStore.Azure.TableStorage.Snapshots.Internal;
     using Corvus.EventStore.Snapshots;
     using Microsoft.Azure.Cosmos.Table;
 
@@ -32,20 +32,26 @@ namespace Corvus.EventStore.Azure.TableStorage.Snapshots
         public async ValueTask<SerializedSnapshot> ReadAsync(Guid aggregateId, string partitionKey, long atSequenceId = long.MaxValue)
         {
             CloudTable cloudTable = await this.cloudTableFactory.GetTableAsync(aggregateId, partitionKey).ConfigureAwait(false);
-            TableQuery<SerializedSnapshotEntity>? query = new TableQuery<SerializedSnapshotEntity>().Where(
+            TableQuery? query = new TableQuery().Where(
                 TableQuery.CombineFilters(
-                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, CommitEntity.BuildPK(aggregateId)),
+                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, TableHelpers.BuildPK(aggregateId)),
                     TableOperators.And,
                     //// Note that this is GreaterThanOrEqual because our RK is a reversed version of the sequence number to permit for "most recent"
-                    TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, CommitEntity.BuildRK(atSequenceId))));
+                    TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, TableHelpers.BuildRK(atSequenceId))));
 
-            TableQuerySegment<SerializedSnapshotEntity> result = await cloudTable.ExecuteQuerySegmentedAsync(query, null);
+            TableQuerySegment<DynamicTableEntity> result = await cloudTable.ExecuteQuerySegmentedAsync(query, null);
             if (!result.Any())
             {
                 return SerializedSnapshot.Empty(aggregateId, partitionKey);
             }
 
-            return result.First().OriginalEntity;
+            DynamicTableEntity entity = result.First();
+            return new SerializedSnapshot(
+                entity.Properties["Snapshot" + nameof(SerializedSnapshot.AggregateId)].GuidValue!.Value,
+                entity.Properties["Snapshot" + nameof(SerializedSnapshot.PartitionKey)].StringValue,
+                entity.Properties["Snapshot" + nameof(SerializedSnapshot.CommitSequenceNumber)].Int64Value!.Value,
+                entity.Properties["Snapshot" + nameof(SerializedSnapshot.EventSequenceNumber)].Int64Value!.Value,
+                entity.Properties["Snapshot" + nameof(SerializedSnapshot.Memento)].BinaryValue);
         }
     }
 }

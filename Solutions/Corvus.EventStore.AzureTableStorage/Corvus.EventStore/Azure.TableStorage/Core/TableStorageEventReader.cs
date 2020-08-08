@@ -35,26 +35,34 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         {
             CloudTable cloudTable = await this.cloudTableFactory.GetTableAsync(aggregateId, partitionKey).ConfigureAwait(false);
 
-            TableQuery<CommitEntity> query = new TableQuery<CommitEntity>()
+            TableQuery query = new TableQuery()
                 .Where(
                     TableQuery.CombineFilters(
-                        TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, CommitEntity.BuildPK(aggregateId)),
+                        TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, TableHelpers.BuildPK(aggregateId)),
                         TableOperators.And,
                         TableQuery.CombineFilters(
-                            TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, CommitEntity.BuildRK(fromSequenceNumber)),
+                            TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, TableHelpers.BuildRK(fromSequenceNumber)),
                             TableOperators.And,
-                            TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThanOrEqual, CommitEntity.BuildRK(toSequenceNumber)))))
+                            TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThanOrEqual, TableHelpers.BuildRK(toSequenceNumber)))))
                 .Take(maxItems);
 
             var resultBuilder = ImmutableArray<Commit>.Empty.ToBuilder();
             TableContinuationToken? continuationToken = null;
             do
             {
-                TableQuerySegment<CommitEntity> result = await cloudTable.ExecuteQuerySegmentedAsync(query, continuationToken, new TableRequestOptions { TableQueryMaxItemCount = maxItems }, null, cancellationToken).ConfigureAwait(false);
+                TableQuerySegment<DynamicTableEntity> result = await cloudTable.ExecuteQuerySegmentedAsync(query, continuationToken, new TableRequestOptions { TableQueryMaxItemCount = maxItems }, null, cancellationToken).ConfigureAwait(false);
                 continuationToken = result.ContinuationToken;
-                foreach (CommitEntity commitEntity in result.Results)
+                foreach (DynamicTableEntity commitEntity in result.Results)
                 {
-                    Commit commit = commitEntity.OriginalEntity;
+                    byte[] entityListAsBinary = commitEntity.Properties["Commit" + nameof(Commit.Events)].BinaryValue;
+                    ImmutableArray<SerializedEvent> events = Utf8JsonEventListSerializer.DeserializeEventList(entityListAsBinary);
+
+                    var commit = new Commit(
+                        commitEntity.Properties["Commit" + nameof(Commit.AggregateId)].GuidValue!.Value,
+                        commitEntity.Properties["Commit" + nameof(Commit.PartitionKey)].StringValue,
+                        commitEntity.Properties["Commit" + nameof(Commit.SequenceNumber)].Int64Value!.Value,
+                        commitEntity.Properties["Commit" + nameof(Commit.Timestamp)].Int64Value!.Value,
+                        events);
                     resultBuilder.Add(commit);
                     cancellationToken.ThrowIfCancellationRequested();
                 }

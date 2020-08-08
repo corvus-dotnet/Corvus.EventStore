@@ -34,7 +34,7 @@ namespace Corvus.EventStore.Example
             await RunInMemoryAsync().ConfigureAwait(false);
 
             Console.WriteLine("Running with table storage.");
-            await RunInMemoryAsync().ConfigureAwait(false);
+            await RunWithTableStorageAsync().ConfigureAwait(false);
         }
 
         private static async Task RunInMemoryAsync()
@@ -141,8 +141,8 @@ namespace Corvus.EventStore.Example
             // We Do things to it and commit it.
 
             // This is the ID of our aggregate - imagine this came in from the request, for example.
-            string aggregateIdAsString = "2c46ed1c-474e-4c94-ac44-0570a46ceb30";
-            var aggregateId = Guid.Parse(aggregateIdAsString);
+            var aggregateId = Guid.NewGuid();
+            string aggregateIdAsString = aggregateId.ToString();
 
             // Using the Id as the partition key.
             string partitionKey = aggregateIdAsString;

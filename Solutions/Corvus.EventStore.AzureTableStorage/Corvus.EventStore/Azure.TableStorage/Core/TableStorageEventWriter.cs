@@ -29,7 +29,13 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         /// <inheritdoc/>
         public async Task WriteCommitAsync(Commit commit)
         {
-            var commitEntity = new CommitEntity(commit);
+            var commitEntity = new DynamicTableEntity(TableHelpers.BuildPK(commit.AggregateId), TableHelpers.BuildRK(commit.SequenceNumber));
+            commitEntity.Properties["Commit" + nameof(Commit.AggregateId)] = new EntityProperty(commit.AggregateId);
+            commitEntity.Properties["Commit" + nameof(Commit.PartitionKey)] = new EntityProperty(commit.PartitionKey);
+            commitEntity.Properties["Commit" + nameof(Commit.SequenceNumber)] = new EntityProperty(commit.SequenceNumber);
+            commitEntity.Properties["Commit" + nameof(Commit.Timestamp)] = new EntityProperty(commit.Timestamp);
+            commitEntity.Properties["Commit" + nameof(Commit.Events)] = new EntityProperty(Utf8JsonEventListSerializer.SerializeEventList(commit.Events));
+
             CloudTable table = await this.cloudTableFactory.GetTableAsync(commit.AggregateId, commit.PartitionKey).ConfigureAwait(false);
 
             var insertOperation = TableOperation.Insert(commitEntity);
@@ -39,7 +45,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             }
             catch (StorageException ex)
             {
-                if (ex.RequestInformation.HttpStatusCode == 400)
+                if (ex.RequestInformation.HttpStatusCode == 409)
                 {
                     throw new ConcurrencyException($"Unable to write the commit for aggregateID {commit.AggregateId} with sequence number {commit.SequenceNumber}.", ex);
                 }
