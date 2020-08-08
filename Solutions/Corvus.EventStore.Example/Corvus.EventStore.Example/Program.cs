@@ -35,6 +35,8 @@ namespace Corvus.EventStore.Example
 
             Console.WriteLine("Running with table storage.");
             await RunWithTableStorageAsync().ConfigureAwait(false);
+
+            Console.ReadKey();
         }
 
         private static async Task RunInMemoryAsync()
