@@ -30,7 +30,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Snapshots
         /// <inheritdoc/>
         public async Task WriteAsync(SerializedSnapshot snapshot)
         {
-            CloudTable table = await this.cloudTableFactory.GetTableAsync(snapshot.AggregateId, snapshot.PartitionKey).ConfigureAwait(false);
+            CloudTable table = this.cloudTableFactory.GetTable(snapshot.AggregateId, snapshot.PartitionKey);
             var entity = new DynamicTableEntity(TableHelpers.BuildPK(snapshot.AggregateId), TableHelpers.BuildRK(snapshot.CommitSequenceNumber));
             entity.Properties["Snapshot" + nameof(snapshot.AggregateId)] = new EntityProperty(snapshot.AggregateId);
             entity.Properties["Snapshot" + nameof(snapshot.PartitionKey)] = new EntityProperty(snapshot.PartitionKey);

@@ -36,7 +36,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             commitEntity.Properties["Commit" + nameof(Commit.Timestamp)] = new EntityProperty(commit.Timestamp);
             commitEntity.Properties["Commit" + nameof(Commit.Events)] = new EntityProperty(Utf8JsonEventListSerializer.SerializeEventList(commit.Events));
 
-            CloudTable table = await this.cloudTableFactory.GetTableAsync(commit.AggregateId, commit.PartitionKey).ConfigureAwait(false);
+            CloudTable table = this.cloudTableFactory.GetTable(commit.AggregateId, commit.PartitionKey);
 
             var insertOperation = TableOperation.Insert(commitEntity);
             try

@@ -33,7 +33,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         /// <inheritdoc/>
         public async ValueTask<EventReaderResult> ReadCommitsAsync(Guid aggregateId, string partitionKey, long fromSequenceNumber, long toSequenceNumber, int maxItems, CancellationToken cancellationToken)
         {
-            CloudTable cloudTable = await this.cloudTableFactory.GetTableAsync(aggregateId, partitionKey).ConfigureAwait(false);
+            CloudTable cloudTable = this.cloudTableFactory.GetTable(aggregateId, partitionKey);
 
             TableQuery query = new TableQuery()
                 .Where(

@@ -31,7 +31,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Snapshots
         /// <inheritdoc/>
         public async ValueTask<SerializedSnapshot> ReadAsync(Guid aggregateId, string partitionKey, long atSequenceId = long.MaxValue)
         {
-            CloudTable cloudTable = await this.cloudTableFactory.GetTableAsync(aggregateId, partitionKey).ConfigureAwait(false);
+            CloudTable cloudTable = this.cloudTableFactory.GetTable(aggregateId, partitionKey);
             TableQuery? query = new TableQuery().Where(
                 TableQuery.CombineFilters(
                     TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, TableHelpers.BuildPK(aggregateId)),

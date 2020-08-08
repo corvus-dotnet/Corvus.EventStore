@@ -14,14 +14,30 @@ namespace Corvus.SnapshotStore.Azure.TableStorage.ContainerFactories
     /// </summary>
     public readonly struct DevelopmentSnapshotCloudTableFactory : ISnapshotCloudTableFactory
     {
-        /// <inheritdoc/>
-        public async Task<CloudTable> GetTableAsync(Guid aggregateId, string partitionKey)
+        private readonly CloudTableClient client;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DevelopmentEventCloudTableFactory"/> struct.
+        /// </summary>
+        /// <param name="tableName">The table name to use.</param>
+        public DevelopmentSnapshotCloudTableFactory(string tableName)
         {
+            this.TableName = tableName;
             CloudStorageAccount account = CloudStorageAccount.DevelopmentStorageAccount;
-            CloudTableClient client = account.CreateCloudTableClient(new TableClientConfiguration());
-            CloudTable table = client.GetTableReference("corvussnapshottable");
-            await table.CreateIfNotExistsAsync().ConfigureAwait(false);
-            return table;
+            this.client = account.CreateCloudTableClient(new TableClientConfiguration());
+            CloudTable table = this.client.GetTableReference(this.TableName);
+            table.CreateIfNotExists();
+        }
+
+        /// <summary>
+        /// Gets the table name.
+        /// </summary>
+        public string TableName { get; }
+
+        /// <inheritdoc/>
+        public CloudTable GetTable(Guid aggregateId, string partitionKey)
+        {
+            return this.client.GetTableReference(this.TableName);
         }
     }
 }

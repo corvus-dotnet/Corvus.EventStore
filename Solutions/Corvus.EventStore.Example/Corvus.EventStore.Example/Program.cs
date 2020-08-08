@@ -136,8 +136,8 @@ namespace Corvus.EventStore.Example
         {
             // Configure the database (in this case a hand-rolled "in memory event store" database. But could be e.g. SQL, Cosmos, Table Storage
             // This would typically be done while you are setting up the container
-            DevelopmentEventCloudTableFactory eventTableFactory = default;
-            DevelopmentSnapshotCloudTableFactory snapshotTableFactory = default;
+            var eventTableFactory = new DevelopmentEventCloudTableFactory("corvusevents");
+            var snapshotTableFactory = new DevelopmentSnapshotCloudTableFactory("corvussnapshots");
 
             // Example 1: Retrieve a new instance of an aggregate from the store. This type of aggregate is implemented over its own in-memory memento.
             // We Do things to it and commit it.

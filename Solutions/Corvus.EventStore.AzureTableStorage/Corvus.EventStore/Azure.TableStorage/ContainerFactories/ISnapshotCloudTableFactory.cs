@@ -5,7 +5,6 @@
 namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
 {
     using System;
-    using System.Threading.Tasks;
     using Microsoft.Azure.Cosmos.Table;
 
     /// <summary>
@@ -20,6 +19,6 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
         /// <param name="aggregateId">The aggregate ID for which to retrieve the table.</param>
         /// <param name="partitionKey">The logical partition key.</param>
         /// <returns>The cloud table for that partition and aggregate.</returns>
-        Task<CloudTable> GetTableAsync(Guid aggregateId, string partitionKey);
+        CloudTable GetTable(Guid aggregateId, string partitionKey);
     }
 }
