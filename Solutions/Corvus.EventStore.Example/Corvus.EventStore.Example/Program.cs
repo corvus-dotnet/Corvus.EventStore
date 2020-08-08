@@ -134,7 +134,7 @@ namespace Corvus.EventStore.Example
 
         private static async Task RunWithTableStorageAsync()
         {
-            // Configure the database (in this case a hand-rolled "in memory event store" database. But could be e.g. SQL, Cosmos, Table Storage
+            // Configure the database (in this case our cloud table factories)
             // This would typically be done while you are setting up the container
             var eventTableFactory = new DevelopmentEventCloudTableFactory("corvusevents");
             var snapshotTableFactory = new DevelopmentSnapshotCloudTableFactory("corvussnapshots");
