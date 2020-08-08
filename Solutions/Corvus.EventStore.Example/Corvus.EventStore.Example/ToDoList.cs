@@ -5,6 +5,7 @@
 namespace Corvus.EventStore.Example
 {
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
     using Corvus.EventStore.Core;
@@ -35,11 +36,28 @@ namespace Corvus.EventStore.Example
         /// <param name="aggregateId">The id of the aggregate to read.</param>
         /// <param name="partitionKey">The partition key of the aggregate to read.</param>
         /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
+        /// <param name="cancellationToken">The (optional) cancelation token for the operation.</param>
         /// <returns>A <see cref="ValueTask"/> which completes with the to do list.</returns>
-        public static async ValueTask<ToDoList> ReadAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue)
+        public static async ValueTask<ToDoList> ReadAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue, CancellationToken cancellationToken = default)
             where TReader : IAggregateReader
         {
-            AggregateWithMemento<ToDoListEventHandler, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>.ReadAsync(reader, aggregateId, partitionKey, MaxItemsPerBatch, commitSequenceNumber).ConfigureAwait(false);
+            AggregateWithMemento<ToDoListEventHandler, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>.ReadAsync(reader, aggregateId, partitionKey, MaxItemsPerBatch, commitSequenceNumber, cancellationToken).ConfigureAwait(false);
+            return new ToDoList(aggregate);
+        }
+
+        /// <summary>
+        /// Reads an instance of a to-do list to the last snapshot, optionally to the last snapshot before the specified commit sequence number.
+        /// </summary>
+        /// <typeparam name="TReader">The type of the <see cref="IAggregateReader"/>.</typeparam>
+        /// <param name="reader">The reader from which to read the aggregate.</param>
+        /// <param name="aggregateId">The id of the aggregate to read.</param>
+        /// <param name="partitionKey">The partition key of the aggregate to read.</param>
+        /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
+        /// <returns>A <see cref="ValueTask"/> which completes with the to do list.</returns>
+        public static async ValueTask<ToDoList> ReadToLastSnapshotAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue)
+            where TReader : IAggregateReader
+        {
+            AggregateWithMemento<ToDoListEventHandler, ToDoListMemento> aggregate = await AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>.ReadToLastSnapshotAsync(reader, aggregateId, partitionKey, MaxItemsPerBatch, commitSequenceNumber).ConfigureAwait(false);
             return new ToDoList(aggregate);
         }
 

@@ -22,6 +22,8 @@ namespace Corvus.EventStore.Aggregates
         where TEventHandler : IAggregateEventHandler<TEventHandler, TMemento>, new()
         where TMemento : new()
     {
+        private static readonly Func<SerializedSnapshot, AggregateWithMemento<TEventHandler, TMemento>> Factory = new Func<SerializedSnapshot, AggregateWithMemento<TEventHandler, TMemento>>(CreateFrom);
+
         /// <summary>
         /// Initializes a new instance of the <see cref="AggregateWithMemento{Task, TMemento}"/> struct.
         /// </summary>
@@ -96,11 +98,39 @@ namespace Corvus.EventStore.Aggregates
         /// <param name="partitionKey">The partition key of the aggregate.</param>
         /// <param name="maxItemsPerBatch">The optional maximum number of items per batch. The default is 100.</param>
         /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
+        /// <param name="cancellationToken">The (optional) cancellation token for the read.</param>
         /// <returns>A <see cref="ValueTask"/> which completes with the aggregate.</returns>
-        public static ValueTask<AggregateWithMemento<TEventHandler, TMemento>> ReadAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, int maxItemsPerBatch = 100, long commitSequenceNumber = long.MaxValue)
+        /// <remarks>
+        /// This will attempt to read the aggregate to the current event. If there are a large number of events being added to the aggregate, then it is possible that you
+        /// will enter into a race condition with the writer where this method never succeeds in reading the aggregate to the end. In this case, you should consider an implementation
+        /// pattern that will break this cycle (e.g. a Polly timeout policy https://github.com/App-vNext/Polly/wiki/Timeout, and/or use of the <see cref="ReadToLastSnapshotAsync"/> method.
+        /// </remarks>
+        public static ValueTask<AggregateWithMemento<TEventHandler, TMemento>> ReadAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, int maxItemsPerBatch = 100, long commitSequenceNumber = long.MaxValue, System.Threading.CancellationToken cancellationToken = default)
             where TReader : IAggregateReader
         {
-            return reader.ReadAsync(s => CreateFrom(s), aggregateId, partitionKey, maxItemsPerBatch, commitSequenceNumber);
+            return reader.ReadAsync(Factory, aggregateId, partitionKey, maxItemsPerBatch, commitSequenceNumber, cancellationToken);
+        }
+
+        /// <summary>
+        /// Reads an instance of an aggregate, to the last snapshot.
+        /// </summary>
+        /// <typeparam name="TReader">The type of the <see cref="IAggregateReader"/>.</typeparam>
+        /// <param name="reader">The reader from which to read the aggregate.</param>
+        /// <param name="aggregateId">The id of the aggregate to read.</param>
+        /// <param name="partitionKey">The partition key of the aggregate.</param>
+        /// <param name="maxItemsPerBatch">The optional maximum number of items per batch. The default is 100.</param>
+        /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
+        /// <returns>A <see cref="ValueTask"/> which completes with the aggregate.</returns>
+        /// <remarks>
+        /// This will attempt to read the aggregate to the last snapshot. You would not typically use this for writing, but for read-only operations offered by the domain logic.
+        /// This is principally to assist with the situation where there are a large number of events being added to the aggrgate, then it is possible that you
+        /// will enter into a race condition with the writer where it never succeeds in reading the aggregate to the end. In this case, you should consider an implementation
+        /// pattern that will break this cycle (e.g. a Polly timeout policy https://github.com/App-vNext/Polly/wiki/Timeout, and/or use this <see cref="ReadToLastSnapshotAsync"/> method to grab the most recent snapshot.
+        /// </remarks>
+        public static ValueTask<AggregateWithMemento<TEventHandler, TMemento>> ReadToLastSnapshotAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, int maxItemsPerBatch = 100, long commitSequenceNumber = long.MaxValue)
+            where TReader : IAggregateReader
+        {
+            return reader.ReadToLastSnapshotAsync(Factory, aggregateId, partitionKey, maxItemsPerBatch, commitSequenceNumber);
         }
 
         /// <summary>

@@ -5,6 +5,7 @@
 namespace Corvus.EventStore.Aggregates
 {
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
     using Corvus.EventStore.Snapshots;
@@ -38,7 +39,8 @@ namespace Corvus.EventStore.Aggregates
             Guid aggregateId,
             string partitionKey,
             int batchSize = 100,
-            long sequenceNumber = long.MaxValue)
+            long sequenceNumber = long.MaxValue,
+            CancellationToken cancellationToken = default)
             where TAggregate : IAggregateRoot<TAggregate>
         {
             SerializedSnapshot serializedSnapshot = await this.snapshotReader.ReadAsync(aggregateId, partitionKey, sequenceNumber).ConfigureAwait(false);
@@ -63,10 +65,19 @@ namespace Corvus.EventStore.Aggregates
                     }
 
                     newEvents = await this.eventReader.ReadCommitsAsync(newEvents.ContinuationToken.Value.Span).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
                 }
             }
 
             return aggregate;
+        }
+
+        /// <inheritdoc/>
+        public async ValueTask<TAggregate> ReadToLastSnapshotAsync<TAggregate>(Func<SerializedSnapshot, TAggregate> aggregateFactory, Guid aggregateId, string partitionKey, int maxItemsPerBatch = 100, long sequenceNumber = long.MaxValue)
+            where TAggregate : IAggregateRoot<TAggregate>
+        {
+            SerializedSnapshot serializedSnapshot = await this.snapshotReader.ReadAsync(aggregateId, partitionKey, sequenceNumber).ConfigureAwait(false);
+            return aggregateFactory(serializedSnapshot);
         }
     }
 }
