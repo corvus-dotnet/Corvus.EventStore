@@ -5,6 +5,7 @@
 namespace Corvus.EventStore.Core
 {
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
 
     /// <summary>
@@ -20,20 +21,23 @@ namespace Corvus.EventStore.Core
         /// <param name="fromSequenceNumber">The minimum <see cref="Event{T}.SequenceNumber"/> to retrieve.</param>
         /// <param name="toSequenceNumber">The maximum <see cref="Event{T}.SequenceNumber"/> to retreive.</param>
         /// <param name="maxItems">The maximum number of items to return.</param>
+        /// <param name="cancellationToken">The cancellation token to abort the operation..</param>
         /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
         ValueTask<EventReaderResult> ReadCommitsAsync(
             Guid aggregateId,
             string partitionKey,
             long fromSequenceNumber,
             long toSequenceNumber,
-            int maxItems);
+            int maxItems,
+            CancellationToken cancellationToken);
 
         /// <summary>
-        /// Reads the next block in a result set initially acquired by calling <see cref="ReadCommitsAsync(Guid, string, long, long, int)"/>.
+        /// Reads the next block in a result set initially acquired by calling <see cref="ReadCommitsAsync(Guid, string, long, long, int, CancellationToken)"/>.
         /// </summary>
         /// <param name="continuationToken">A continuation token returned from a previous call that can be used to
         /// obtain the next set of results.</param>
+        /// <param name="cancellationToken">The cancellation token to abort the operation.</param>
         /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
-        ValueTask<EventReaderResult> ReadCommitsAsync(ReadOnlySpan<byte> continuationToken);
+        ValueTask<EventReaderResult> ReadCommitsAsync(ReadOnlySpan<byte> continuationToken, CancellationToken cancellationToken);
     }
 }

@@ -2,12 +2,12 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.InMemory.Aggregates
+namespace Corvus.EventStore.Azure.TableStorage.Aggregates
 {
     using Corvus.EventStore.Aggregates;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
-    using Corvus.EventStore.InMemory.Core;
-    using Corvus.EventStore.InMemory.Snapshots;
+    using Corvus.EventStore.Azure.TableStorage.Core;
+    using Corvus.EventStore.Azure.TableStorage.Snapshots;
 
     /// <summary>
     /// Methods to help manage an in-memory version of <see cref="IAggregateWriter"/>.

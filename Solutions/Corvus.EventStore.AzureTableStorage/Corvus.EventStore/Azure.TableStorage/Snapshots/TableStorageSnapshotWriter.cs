@@ -2,12 +2,11 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.InMemory.Snapshots
+namespace Corvus.EventStore.Azure.TableStorage.Snapshots
 {
     using System;
     using System.Threading.Tasks;
-    using Corvus.EventStore.Core;
-    using Corvus.EventStore.InMemory.Aggregates;
+    using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
     using Corvus.EventStore.Snapshots;
 
     /// <summary>

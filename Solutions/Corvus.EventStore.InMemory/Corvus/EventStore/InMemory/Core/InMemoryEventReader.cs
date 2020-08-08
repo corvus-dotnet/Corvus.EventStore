@@ -5,6 +5,7 @@
 namespace Corvus.EventStore.InMemory.Core
 {
     using System;
+    using System.Threading;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
     using Corvus.EventStore.InMemory.Core.Internal;
@@ -26,13 +27,13 @@ namespace Corvus.EventStore.InMemory.Core
         }
 
         /// <inheritdoc/>
-        public ValueTask<EventReaderResult> ReadCommitsAsync(ReadOnlySpan<byte> continuationToken)
+        public ValueTask<EventReaderResult> ReadCommitsAsync(ReadOnlySpan<byte> continuationToken, CancellationToken cancellationToken)
         {
             return this.store.ReadAsync(continuationToken);
         }
 
         /// <inheritdoc/>
-        public ValueTask<EventReaderResult> ReadCommitsAsync(Guid aggregateId, string partitionKey, long fromSequenceNumber, long toSequenceNumber, int maxItems)
+        public ValueTask<EventReaderResult> ReadCommitsAsync(Guid aggregateId, string partitionKey, long fromSequenceNumber, long toSequenceNumber, int maxItems, CancellationToken cancellationToken)
         {
             return this.store.ReadCommitsAsync(aggregateId, fromSequenceNumber, toSequenceNumber, maxItems);
         }

@@ -53,7 +53,8 @@ namespace Corvus.EventStore.Aggregates
                     aggregate.PartitionKey,
                     aggregate.CommitSequenceNumber + 1,
                     sequenceNumber,
-                    batchSize).ConfigureAwait(false);
+                    batchSize,
+                    cancellationToken).ConfigureAwait(false);
 
                 while (true)
                 {
@@ -64,7 +65,7 @@ namespace Corvus.EventStore.Aggregates
                         break;
                     }
 
-                    newEvents = await this.eventReader.ReadCommitsAsync(newEvents.ContinuationToken.Value.Span).ConfigureAwait(false);
+                    newEvents = await this.eventReader.ReadCommitsAsync(newEvents.ContinuationToken.Value.Span, cancellationToken).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
                 }
             }

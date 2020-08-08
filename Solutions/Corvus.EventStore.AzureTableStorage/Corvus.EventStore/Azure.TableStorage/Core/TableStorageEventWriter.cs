@@ -2,12 +2,13 @@
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.InMemory.Core
+namespace Corvus.EventStore.Azure.TableStorage.Core
 {
-    using System;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
+    using Corvus.EventStore.Azure.TableStorage.Core.Internal;
     using Corvus.EventStore.Core;
+    using Microsoft.Azure.Cosmos.Table;
 
     /// <summary>
     /// In-memory implementation of <see cref="IEventWriter"/>.
@@ -26,9 +27,26 @@ namespace Corvus.EventStore.InMemory.Core
         }
 
         /// <inheritdoc/>
-        public Task WriteCommitAsync(Commit commit)
+        public async Task WriteCommitAsync(Commit commit)
         {
-            throw new NotImplementedException();
+            var commitEntity = new CommitEntity(commit);
+            CloudTable table = await this.cloudTableFactory.GetTableAsync(commit.AggregateId, commit.PartitionKey).ConfigureAwait(false);
+
+            var insertOperation = TableOperation.Insert(commitEntity);
+            try
+            {
+                _ = await table.ExecuteAsync(insertOperation).ConfigureAwait(false);
+            }
+            catch (StorageException ex)
+            {
+                if (ex.RequestInformation.HttpStatusCode == 400)
+                {
+                    throw new ConcurrencyException($"Unable to write the commit for aggregateID {commit.AggregateId} with sequence number {commit.SequenceNumber}.", ex);
+                }
+
+                // Rethrow if we had a general storage exception.
+                throw;
+            }
         }
     }
 }
