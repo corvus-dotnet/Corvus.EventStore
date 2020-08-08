@@ -111,7 +111,6 @@ namespace Corvus.EventStore.Serialization.Json.Converters
                     TValue v;
                     if (this.valueConverter != null)
                     {
-                        reader.Read();
                         v = this.valueConverter.Read(ref reader, this.valueType, options);
                     }
                     else

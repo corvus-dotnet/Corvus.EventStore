@@ -88,7 +88,6 @@ namespace Corvus.EventStore.Azure.TableStorage.Core.Internal
                     TValue v;
                     if (this.valueConverter != null)
                     {
-                        reader.Read();
                         v = this.valueConverter.Read(ref reader, this.valueType, options);
                     }
                     else

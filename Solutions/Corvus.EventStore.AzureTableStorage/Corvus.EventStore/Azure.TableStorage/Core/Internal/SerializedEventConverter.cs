@@ -25,15 +25,17 @@ namespace Corvus.EventStore.Azure.TableStorage.Core.Internal
             Type typeToConvert,
             JsonSerializerOptions options)
         {
+            if (reader.TokenType != JsonTokenType.StartObject)
+            {
+                throw new JsonException();
+            }
+
             (string eventType, long sequenceNumber, long timestamp, ReadOnlyMemory<byte> payload) = (string.Empty, -1, -1, ReadOnlyMemory<byte>.Empty);
 
             // Read each of the four properties.
             (eventType, sequenceNumber, timestamp, payload) = this.ReadProperty(ref reader, options, (eventType, sequenceNumber, timestamp, payload));
-            reader.Read();
             (eventType, sequenceNumber, timestamp, payload) = this.ReadProperty(ref reader, options, (eventType, sequenceNumber, timestamp, payload));
-            reader.Read();
             (eventType, sequenceNumber, timestamp, payload) = this.ReadProperty(ref reader, options, (eventType, sequenceNumber, timestamp, payload));
-            reader.Read();
             (eventType, sequenceNumber, timestamp, payload) = this.ReadProperty(ref reader, options, (eventType, sequenceNumber, timestamp, payload));
 
             reader.Read();
@@ -62,6 +64,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core.Internal
 
         private (string eventType, long sequenceNumber, long timestamp, ReadOnlyMemory<byte> payload) ReadProperty(ref Utf8JsonReader reader, JsonSerializerOptions options, (string eventType, long sequenceNumber, long timestamp, ReadOnlyMemory<byte> payload) result)
         {
+            reader.Read();
+
             if (reader.TokenType != JsonTokenType.PropertyName)
             {
                 throw new JsonException();
