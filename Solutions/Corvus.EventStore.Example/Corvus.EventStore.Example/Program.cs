@@ -5,6 +5,9 @@
 namespace Corvus.EventStore.Example
 {
     using System;
+    using System.Collections.Generic;
+    using System.Diagnostics;
+    using System.Linq;
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
     using Corvus.EventStore.Azure.TableStorage.Aggregates;
@@ -17,6 +20,7 @@ namespace Corvus.EventStore.Example
     using Corvus.EventStore.InMemory.Core.Internal;
     using Corvus.EventStore.InMemory.Snapshots;
     using Corvus.EventStore.InMemory.Snapshots.Internal;
+    using Corvus.Extensions;
     using Corvus.SnapshotStore.Azure.TableStorage.ContainerFactories;
 
     /// <summary>
@@ -35,6 +39,14 @@ namespace Corvus.EventStore.Example
 
             Console.WriteLine("Running with table storage.");
             await RunWithTableStorageAsync().ConfigureAwait(false);
+
+            Console.WriteLine("Running in memory with multiple iterations");
+
+            await RunInMemoryMultipleIterationsAsync().ConfigureAwait(false);
+
+            Console.WriteLine("Running with multi-partition table storage");
+
+            await RunWithMultiPartitionTableStorageAsync().ConfigureAwait(false);
 
             Console.ReadKey();
         }
@@ -222,6 +234,141 @@ namespace Corvus.EventStore.Example
             catch (InvalidOperationException ex)
             {
                 Console.WriteLine($"Oh dear - {ex.Message}");
+            }
+        }
+
+        private static async Task RunWithMultiPartitionTableStorageAsync()
+        {
+            // Configure the database (in this case our cloud table factories)
+            // This would typically be done while you are setting up the container
+            // Here, we are setting up two separate physical partitions for the storage
+            // (in a real implementation this would typically be in two entirely different storage accounts to improve throughput)
+            var eventTableFactoryP1 = new DevelopmentEventCloudTableFactory("corvusevents1");
+            var eventTableFactoryP2 = new DevelopmentEventCloudTableFactory("corvusevents2");
+            var eventTableFactory = new PartitionedEventCloudTableFactory<DevelopmentEventCloudTableFactory>(eventTableFactoryP1, eventTableFactoryP2);
+            var snapshotTableFactory = new DevelopmentSnapshotCloudTableFactory("corvussnapshots");
+
+            // Example 1: Retrieve a new instance of an aggregate from the store. This type of aggregate is implemented over its own in-memory memento.
+            // We Do things to it and commit it.
+
+            // Create an aggregate reader for the configured store. This is cheap and can be done every time. It is stateless.
+            // You would typically get this as a transient from the container. But as you can see you can just new everything up, too.
+            // This happens to use an in memory reader for both the events and the snapshots, but you could (and frequently would) configure the AggregateReader with
+            // different readers for events and snapshots so that they can go to different stores.
+            AggregateReader<TableStorageEventReader, TableStorageSnapshotReader> reader =
+                TableStorageAggregateReader.GetInstance(eventTableFactory, snapshotTableFactory);
+
+            // Create an aggregate writer for the configured store. This is cheap and can be done every time. It is stateless.
+            AggregateWriter<TableStorageEventWriter, TableStorageSnapshotWriter> writer =
+                TableStorageAggregateWriter.GetInstance(eventTableFactory, snapshotTableFactory);
+
+            // This is the ID of our aggregate - imagine this came in from the request, for example.
+            Guid[] aggregateIds = Enumerable.Range(0, 1000)
+                .Select(i => Guid.NewGuid())
+                .ToArray();
+
+            var aggregates = new ToDoList[aggregateIds.Length];
+
+            Console.Write("Initializing aggregates");
+
+            await aggregateIds.ForEachAtIndexAsync(async (aggregateId, index) =>
+                {
+                    Console.Write($".");
+                    aggregates[index] = await ToDoList.ReadAsync(reader, aggregateId, aggregateId.ToString()).ConfigureAwait(false);
+                }).ConfigureAwait(false);
+
+            Console.WriteLine();
+
+            const int batchSize = 100;
+
+            for (int i = 0; i < 1000; ++i)
+            {
+                Console.WriteLine($"Iteration {i}");
+                var sw = Stopwatch.StartNew();
+                for (int batch = 0; batch < aggregateIds.Length / batchSize; ++batch)
+                {
+                    Console.WriteLine($"Batch {batch}");
+
+                    var taskList = new List<Task<ToDoList>>();
+
+                    for (int taskCount = 0; taskCount < batchSize; ++taskCount)
+                    {
+                        ToDoList toDoList = aggregates[(batch * batchSize) + taskCount];
+                        toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
+                        toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "Another day, another item", "This is the item in question");
+                        ValueTask<ToDoList> task = toDoList.CommitAsync(writer);
+                        taskList.Add(task.AsTask());
+                    }
+
+                    ToDoList[] batchAggregates = await Task.WhenAll(taskList).ConfigureAwait(false);
+                    batchAggregates.CopyTo(aggregates, batch * batchSize);
+                    sw.Stop();
+                    Console.WriteLine(sw.ElapsedMilliseconds);
+                }
+            }
+        }
+
+        private static async Task RunInMemoryMultipleIterationsAsync()
+        {
+            // Configure the database (in this case a hand-rolled "in memory event store" database. But could be e.g. SQL, Cosmos, Table Storage
+            // This would typically be done while you are setting up the container
+            var inMemoryEventStore = new InMemoryEventStore();
+            var inMemorySnapshotStore = new InMemorySnapshotStore();
+
+            AggregateReader<InMemoryEventReader, InMemorySnapshotReader> reader =
+                InMemoryAggregateReader.GetInstance(inMemoryEventStore, inMemorySnapshotStore);
+
+            // Create an aggregate writer for the configured store. This is cheap and can be done every time. It is stateless.
+            AggregateWriter<InMemoryEventWriter, InMemorySnapshotWriter> writer =
+                InMemoryAggregateWriter.GetInstance(inMemoryEventStore, inMemorySnapshotStore);
+
+            // This is the ID of our aggregate - imagine this came in from the request, for example.
+            Guid[] aggregateIds = Enumerable.Range(0, 1000)
+                .Select(i => Guid.NewGuid())
+                .ToArray();
+
+            var aggregates = new ToDoList[aggregateIds.Length];
+
+            Console.Write("Initializing aggregates");
+
+            await aggregateIds.ForEachAtIndexAsync(async (aggregateId, index) =>
+            {
+                Console.Write($".");
+                aggregates[index] = await ToDoList.ReadAsync(reader, aggregateId, aggregateId.ToString()).ConfigureAwait(false);
+            }).ConfigureAwait(false);
+
+            Console.WriteLine();
+
+            const int batchSize = 1000;
+
+            for (int i = 0; i < 100; ++i)
+            {
+                Console.WriteLine($"Iteration {i}");
+                for (int batch = 0; batch < aggregateIds.Length / batchSize; ++batch)
+                {
+                    Console.WriteLine($"Batch {batch}");
+
+                    var sw = Stopwatch.StartNew();
+
+                    for (int taskCount = 0; taskCount < batchSize; ++taskCount)
+                    {
+                        ToDoList toDoList = aggregates[(batch * batchSize) + taskCount];
+                        toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
+                        toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "Another day, another item", "This is the item in question");
+                        ValueTask<ToDoList> task = toDoList.CommitAsync(writer);
+                        if (!task.IsCompleted)
+                        {
+                            aggregates[(batch * batchSize) + taskCount] = await task.ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            aggregates[(batch * batchSize) + taskCount] = task.Result;
+                        }
+                    }
+
+                    sw.Stop();
+                    Console.WriteLine(sw.ElapsedMilliseconds);
+                }
             }
         }
     }

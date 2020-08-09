@@ -17,6 +17,8 @@ namespace Corvus.EventStore.Example.Internal.Mementos
     [JsonConverter(typeof(Converter))]
     internal readonly struct ToDoListMemento
     {
+        private readonly ImmutableArray<Guid> itemIds;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ToDoListMemento"/> struct.
         /// </summary>
@@ -25,7 +27,7 @@ namespace Corvus.EventStore.Example.Internal.Mementos
         /// <param name="startDate">The <see cref="StartDate"/>.</param>
         public ToDoListMemento(ImmutableArray<Guid> itemIds, string owner, DateTimeOffset startDate)
         {
-            this.ItemIds = itemIds;
+            this.itemIds = itemIds;
             this.Owner = owner;
             this.StartDate = startDate;
         }
@@ -34,7 +36,7 @@ namespace Corvus.EventStore.Example.Internal.Mementos
         /// Gets the array of IDs of the to-do items currently in the list.
         /// </summary>
         /// <remarks>This illustrates that the memento only needs enough state for the domain logic to do its job.</remarks>
-        public ImmutableArray<Guid> ItemIds { get; }
+        public ImmutableArray<Guid> ItemIds => this.GetOrCreateItems();
 
         /// <summary>
         /// Gets the owner of the list.
@@ -54,7 +56,7 @@ namespace Corvus.EventStore.Example.Internal.Mementos
         /// <returns>A <see cref="ToDoListMemento"/> with the item added.</returns>
         public ToDoListMemento With(ToDoItemAddedEventPayload payload)
         {
-            return new ToDoListMemento(this.GetOrCreateItems().Add(payload.ToDoItemId), this.Owner, this.StartDate);
+            return new ToDoListMemento(this.ItemIds.Add(payload.ToDoItemId), this.Owner, this.StartDate);
         }
 
         /// <summary>
@@ -64,7 +66,7 @@ namespace Corvus.EventStore.Example.Internal.Mementos
         /// <returns>A <see cref="ToDoListMemento"/> with the item removed.</returns>
         public ToDoListMemento With(ToDoItemRemovedEventPayload payload)
         {
-            return new ToDoListMemento(this.GetOrCreateItems().Remove(payload.ToDoItemId), this.Owner, this.StartDate);
+            return new ToDoListMemento(this.ItemIds.Remove(payload.ToDoItemId), this.Owner, this.StartDate);
         }
 
         /// <summary>
@@ -74,7 +76,7 @@ namespace Corvus.EventStore.Example.Internal.Mementos
         /// <returns>A <see cref="ToDoListMemento"/> with the owner set.</returns>
         public ToDoListMemento With(ToDoListOwnerSetEventPayload payload)
         {
-            return new ToDoListMemento(this.GetOrCreateItems(), payload.Owner, this.StartDate);
+            return new ToDoListMemento(this.ItemIds, payload.Owner, this.StartDate);
         }
 
         /// <summary>
@@ -84,12 +86,12 @@ namespace Corvus.EventStore.Example.Internal.Mementos
         /// <returns>A <see cref="ToDoListMemento"/> with the owner set.</returns>
         public ToDoListMemento With(ToDoListStartDateSetEventPayload payload)
         {
-            return new ToDoListMemento(this.GetOrCreateItems(), this.Owner, payload.StartDate);
+            return new ToDoListMemento(this.ItemIds, this.Owner, payload.StartDate);
         }
 
         private ImmutableArray<Guid> GetOrCreateItems()
         {
-            return this.ItemIds.IsDefault ? ImmutableArray<Guid>.Empty : this.ItemIds;
+            return this.itemIds.IsDefault ? ImmutableArray<Guid>.Empty : this.itemIds;
         }
 
         private class Converter : JsonConverter<ToDoListMemento>

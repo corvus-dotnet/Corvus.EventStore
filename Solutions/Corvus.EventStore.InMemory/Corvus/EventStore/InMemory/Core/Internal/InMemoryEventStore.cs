@@ -83,7 +83,9 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return new CommitList(0, ImmutableDictionary<long, Commit>.Empty.Add(0, commit));
+                    ImmutableDictionary<long, Commit>.Builder builder = ImmutableDictionary.CreateBuilder<long, Commit>();
+                    builder.Add(0, commit);
+                    return new CommitList(0, builder.ToImmutable());
                 },
                 (aggregateId, list) =>
                 {
@@ -97,7 +99,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                         throw new InMemoryEventStoreEventOutOfSequenceException();
                     }
 
-                    return list.AddCommits(ImmutableArray<Commit>.Empty.Add(commit));
+                    return list.AddCommits(ImmutableArray.Create(commit));
                 });
 
             return Task.CompletedTask;

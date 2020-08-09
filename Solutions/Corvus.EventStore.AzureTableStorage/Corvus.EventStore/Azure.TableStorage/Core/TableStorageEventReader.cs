@@ -46,7 +46,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                             TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThanOrEqual, TableHelpers.BuildRK(toSequenceNumber)))))
                 .Take(maxItems);
 
-            var resultBuilder = ImmutableArray<Commit>.Empty.ToBuilder();
+            ImmutableArray<Commit>.Builder resultBuilder = ImmutableArray.CreateBuilder<Commit>();
             TableContinuationToken? continuationToken = null;
             do
             {

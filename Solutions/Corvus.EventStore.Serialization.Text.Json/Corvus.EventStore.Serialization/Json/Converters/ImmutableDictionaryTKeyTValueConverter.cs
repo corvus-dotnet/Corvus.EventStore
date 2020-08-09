@@ -81,7 +81,7 @@ namespace Corvus.EventStore.Serialization.Json.Converters
                     throw new JsonException();
                 }
 
-                var builder = ImmutableDictionary<TKey, TValue>.Empty.ToBuilder();
+                ImmutableDictionary<TKey, TValue>.Builder builder = ImmutableDictionary.CreateBuilder<TKey, TValue>();
 
                 while (reader.Read())
                 {

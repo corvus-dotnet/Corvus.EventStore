@@ -5,6 +5,7 @@
 namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
 {
     using System;
+    using System.Collections.Immutable;
     using Microsoft.Azure.Cosmos.Table;
 
     /// <summary>
@@ -20,5 +21,11 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
         /// <param name="partitionKey">The logical partition key.</param>
         /// <returns>The cloud table for that partition and aggregate.</returns>
         CloudTable GetTable(Guid aggregateId, string partitionKey);
+
+        /// <summary>
+        /// Gets references to all the cloud tables provided by this table factory.
+        /// </summary>
+        /// <returns>An immutable array of the tables provided by the table factory.</returns>
+        ImmutableArray<CloudTable> GetTables();
     }
 }

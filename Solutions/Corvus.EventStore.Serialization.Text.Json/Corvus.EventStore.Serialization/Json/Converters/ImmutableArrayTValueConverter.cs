@@ -75,7 +75,7 @@ namespace Corvus.EventStore.Serialization.Json.Converters
                     throw new JsonException();
                 }
 
-                var builder = ImmutableArray<TValue>.Empty.ToBuilder();
+                ImmutableArray<TValue>.Builder builder = ImmutableArray.CreateBuilder<TValue>();
 
                 while (reader.Read())
                 {

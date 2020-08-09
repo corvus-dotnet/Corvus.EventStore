@@ -75,7 +75,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core.Internal
                     throw new JsonException();
                 }
 
-                var builder = ImmutableArray<TValue>.Empty.ToBuilder();
+                ImmutableArray<TValue>.Builder builder = ImmutableArray.CreateBuilder<TValue>();
 
                 while (reader.Read())
                 {

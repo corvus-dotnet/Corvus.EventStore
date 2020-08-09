@@ -59,7 +59,9 @@ namespace Corvus.EventStore.InMemory.Snapshots.Internal
                 snapshot.AggregateId,
                 seq =>
                 {
-                    return new SnapshotList(ImmutableDictionary<long, SerializedSnapshot>.Empty.Add(localSnapshot.CommitSequenceNumber, localSnapshot));
+                    ImmutableDictionary<long, SerializedSnapshot>.Builder builder = ImmutableDictionary.CreateBuilder<long, SerializedSnapshot>();
+                    builder.Add(localSnapshot.CommitSequenceNumber, localSnapshot);
+                    return new SnapshotList(builder.ToImmutable());
                 },
                 (aggregateId, list) =>
                 {

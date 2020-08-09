@@ -5,6 +5,7 @@
 namespace Corvus.SnapshotStore.Azure.TableStorage.ContainerFactories
 {
     using System;
+    using System.Collections.Immutable;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
     using Microsoft.Azure.Cosmos.Table;
@@ -25,7 +26,7 @@ namespace Corvus.SnapshotStore.Azure.TableStorage.ContainerFactories
             this.TableName = tableName;
             CloudStorageAccount account = CloudStorageAccount.DevelopmentStorageAccount;
             this.client = account.CreateCloudTableClient(new TableClientConfiguration());
-            CloudTable table = this.client.GetTableReference(this.TableName);
+            CloudTable table = this.GetTableReference();
             table.CreateIfNotExists();
         }
 
@@ -37,7 +38,18 @@ namespace Corvus.SnapshotStore.Azure.TableStorage.ContainerFactories
         /// <inheritdoc/>
         public CloudTable GetTable(Guid aggregateId, string partitionKey)
         {
-            return this.client.GetTableReference(this.TableName);
+            return this.GetTableReference();
+        }
+
+        /// <inheritdoc/>
+        public ImmutableArray<CloudTable> GetTables()
+        {
+            return ImmutableArray.Create(this.GetTableReference());
+        }
+
+        private CloudTable GetTableReference()
+        {
+            return this.client.GetTableReference(this.TableName ?? "corvussnapshots");
         }
     }
 }
