@@ -12,7 +12,7 @@ namespace Corvus.EventStore.Core
     /// </summary>
     /// <remarks>
     /// If any of the filter types are empty, then NO filter is applied for that type.
-    /// For each filter type which is not empty, the list is narrowed to only those events which
+    /// For each filter type which is not empty, the list is narrowed to only those commits which
     /// match ANY OF the supplied values of that type. Each type is applied in turn.
     /// </remarks>
     public readonly struct EventFeedFilter
@@ -23,13 +23,11 @@ namespace Corvus.EventStore.Core
         public static readonly EventFeedFilter Empty = default;
         private readonly ImmutableArray<Guid> aggregateIds;
         private readonly ImmutableArray<string> partitionKeys;
-        private readonly ImmutableArray<string> eventTypes;
 
-        private EventFeedFilter(ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys, ImmutableArray<string> eventTypes)
+        private EventFeedFilter(ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys)
         {
             this.aggregateIds = aggregateIds;
             this.partitionKeys = partitionKeys;
-            this.eventTypes = eventTypes;
         }
 
         /// <summary>
@@ -43,18 +41,13 @@ namespace Corvus.EventStore.Core
         public ImmutableArray<Guid> AggregateIds => this.aggregateIds.IsDefault ? ImmutableArray<Guid>.Empty : this.aggregateIds;
 
         /// <summary>
-        /// Gets the list of <see cref="EventTypes"/> whose events are to be included in the result set.
-        /// </summary>
-        public ImmutableArray<string> EventTypes => this.eventTypes.IsDefault ? ImmutableArray<string>.Empty : this.eventTypes;
-
-        /// <summary>
         /// Adds aggregate IDs to the filter.
         /// </summary>
         /// <param name="aggregateIds">The aggregate IDs to add.</param>
         /// <returns>The event feed filter with the added aggregate Ids.</returns>
         public EventFeedFilter WithAggregateIds(params Guid[] aggregateIds)
         {
-            return new EventFeedFilter(this.AggregateIds.AddRange(aggregateIds), this.PartitionKeys, this.EventTypes);
+            return new EventFeedFilter(this.AggregateIds.AddRange(aggregateIds), this.PartitionKeys);
         }
 
         /// <summary>
@@ -64,17 +57,7 @@ namespace Corvus.EventStore.Core
         /// <returns>The event feed filter with the added partition keys.</returns>
         public EventFeedFilter WithPartitionKeys(params string[] partitionKeys)
         {
-            return new EventFeedFilter(this.AggregateIds, this.PartitionKeys.AddRange(partitionKeys), this.EventTypes);
-        }
-
-        /// <summary>
-        /// Adds event types to the filter.
-        /// </summary>
-        /// <param name="partitionKeys">The event types to add.</param>
-        /// <returns>The event feed filter with the added event types.</returns>
-        public EventFeedFilter WithEventTypes(params string[] partitionKeys)
-        {
-            return new EventFeedFilter(this.AggregateIds, this.PartitionKeys.AddRange(partitionKeys), this.EventTypes);
+            return new EventFeedFilter(this.AggregateIds, this.PartitionKeys.AddRange(partitionKeys));
         }
     }
 }

@@ -36,7 +36,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         /// <returns>A <see cref="ValueTask{T}"/> of type <see cref="EventFeedResult"/>.</returns>
         public ValueTask<EventFeedResult> GetFeed(EventFeedFilter filter, int maxItems)
         {
-            return this.GetFeedCore(filter.AggregateIds, filter.PartitionKeys, filter.EventTypes, maxItems, 0, 0);
+            return this.GetFeedCore(filter.AggregateIds, filter.PartitionKeys, maxItems, 0);
         }
 
         /// <summary>
@@ -50,7 +50,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         public ValueTask<EventFeedResult> GetFeed(ReadOnlyMemory<byte> fromCheckpoint)
         {
             Checkpoint cp = JsonSerializer.Deserialize<Checkpoint>(fromCheckpoint.Span);
-            return this.GetFeedCore(cp.AggregateIds, cp.PartitionKeys, cp.EventTypes, cp.MaxItems, cp.CommitIndex, cp.EventIndex);
+            return this.GetFeedCore(cp.AggregateIds, cp.PartitionKeys, cp.MaxItems, cp.CommitIndex);
         }
 
         /// <summary>
@@ -136,6 +136,14 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                     return list.AddCommits(ImmutableArray.Create(commit));
                 });
 
+            // It is possible that our thread could be murdered between writing the event commit and
+            // writing the all stream. We would then have the even in the store, but not in this stream.
+            // That would not be highly desirable. A more robust implementation would use the separate process
+            // to write the all stream, and checkpoint where it had got to.
+            // There is also the issue that this could be interleaved with other updates for the aggregate (although
+            // the commit itself will appear as an atomic unit). This a general issue with the events as they may
+            // be delivered out-of-order or more than once, when you are no longer in the context of a single commit. You have
+            // to inspect the commit and determine if you are receving it "in order" or not.
             lock (this.allStreamLock)
             {
                 this.allStream = this.allStream.Add((this.allStream.Count, commit.AggregateId, eventIndex));
@@ -144,7 +152,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
             return Task.CompletedTask;
         }
 
-        private ValueTask<EventFeedResult> GetFeedCore(ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys, ImmutableArray<string> eventTypes, int maxItems, int initialCommitIndex, int initialEventIndex)
+        private ValueTask<EventFeedResult> GetFeedCore(ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys, int maxItems, int initialCommitIndex)
         {
             // Because the allstream is an immutable list, we are safe to operate on it like this.
             ImmutableList<(int, Guid, int)> localAllStream = this.allStream;
@@ -160,11 +168,8 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                 stream = stream.Where(item => partitionKeys.Contains(this.store[item.Item2].Commits[item.Item3].PartitionKey));
             }
 
-            // The first time through we use the initial event index
-            int eventIndex = initialEventIndex;
+            ImmutableArray<Commit>.Builder builder = ImmutableArray.CreateBuilder<Commit>();
 
-            // Stream is now a commit feed filtered by aggregate ID and partition key
-            ImmutableArray<SerializedEvent>.Builder builder = ImmutableArray.CreateBuilder<SerializedEvent>();
             foreach ((int, Guid, int) current in stream)
             {
                 Commit commit;
@@ -173,41 +178,20 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                     throw new InvalidOperationException("The store `allStream` is out of sync with the individual aggregate stores, and should be rebuilt.");
                 }
 
-                foreach (SerializedEvent @event in commit.Events.Skip(eventIndex))
+                builder.Add(commit);
+                if (builder.Count == maxItems)
                 {
-                    eventIndex++;
-                    if (!eventTypes.Any() || eventTypes.Contains(@event.EventType))
-                    {
-                        builder.Add(@event);
-                        if (builder.Count == maxItems)
-                        {
-                            return new ValueTask<EventFeedResult>(this.BuildEventFeedResult(aggregateIds, partitionKeys, eventTypes, maxItems, builder, commit, current.Item1, eventIndex));
-                        }
-                    }
+                    break;
                 }
-
-                // Next commit, we start from the first event in the commit
-                eventIndex = 0;
             }
 
             // If we got to the end of the list, point at the next commit (even if it doesn't exist yet).
-            return new ValueTask<EventFeedResult>(new EventFeedResult(builder.ToImmutable(), this.BuildCheckpoint(aggregateIds, partitionKeys, eventTypes, maxItems, localAllStream.Count, 0)));
+            return new ValueTask<EventFeedResult>(new EventFeedResult(builder.ToImmutable(), this.BuildCheckpoint(aggregateIds, partitionKeys, maxItems, localAllStream.Count)));
         }
 
-        private EventFeedResult BuildEventFeedResult(ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys, ImmutableArray<string> eventTypes, int maxItems, ImmutableArray<SerializedEvent>.Builder builder, Commit commit, int commitIndex, int eventIndex)
+        private ReadOnlyMemory<byte> BuildCheckpoint(ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys, int maxItems, int commitIndex)
         {
-            if (eventIndex == commit.Events.Length)
-            {
-                eventIndex = 0;
-                commitIndex += 1;
-            }
-
-            return new EventFeedResult(builder.ToImmutable(), this.BuildCheckpoint(aggregateIds, partitionKeys, eventTypes, maxItems, commitIndex, eventIndex));
-        }
-
-        private ReadOnlyMemory<byte> BuildCheckpoint(ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys, ImmutableArray<string> eventTypes, int maxItems, int commitIndex, int eventIndex)
-        {
-            return JsonSerializer.SerializeToUtf8Bytes(new Checkpoint(commitIndex, eventIndex, aggregateIds, partitionKeys, eventTypes, maxItems));
+            return JsonSerializer.SerializeToUtf8Bytes(new Checkpoint(commitIndex, aggregateIds, partitionKeys, maxItems));
         }
 
         private struct ContinuationToken
@@ -231,21 +215,15 @@ namespace Corvus.EventStore.InMemory.Core.Internal
 
         private struct Checkpoint
         {
-            public Checkpoint(int commitIndex, int eventIndex, ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys, ImmutableArray<string> eventTypes, int maxItems)
+            public Checkpoint(int commitIndex, ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys, int maxItems)
             {
                 this.CommitIndex = commitIndex;
-                this.EventIndex = eventIndex;
-                this.EventTypes = eventTypes;
                 this.AggregateIds = aggregateIds;
                 this.PartitionKeys = partitionKeys;
                 this.MaxItems = maxItems;
             }
 
-            public int CommitIndex { get; set;  }
-
-            public int EventIndex { get; set; }
-
-            public ImmutableArray<string> EventTypes { get; set; }
+            public int CommitIndex { get; set; }
 
             public ImmutableArray<Guid> AggregateIds { get; set; }
 

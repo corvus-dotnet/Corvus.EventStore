@@ -15,11 +15,11 @@ namespace Corvus.EventStore.Core
         /// <summary>
         /// Initializes a new instance of the <see cref="EventFeedResult"/> struct.
         /// </summary>
-        /// <param name="events">The <see cref="Events"/>.</param>
+        /// <param name="commits">The <see cref="Commits"/>.</param>
         /// <param name="checkpoint">The <see cref="Checkpoint"/>.</param>
-        public EventFeedResult(in IEnumerable<SerializedEvent> events, ReadOnlyMemory<byte> checkpoint)
+        public EventFeedResult(in IEnumerable<Commit> commits, ReadOnlyMemory<byte> checkpoint)
         {
-            this.Events = events;
+            this.Commits = commits;
             this.Checkpoint = checkpoint;
         }
 
@@ -35,12 +35,12 @@ namespace Corvus.EventStore.Core
         public ReadOnlyMemory<byte> Checkpoint { get; }
 
         /// <summary>
-        /// Gets the events in this result set.
+        /// Gets the commits in this result set.
         /// </summary>
         /// <remarks>
-        /// There may be no events in this particular result set either because of filtering
-        /// or because there are literally no more events at the time of asking.
+        /// There may be no commits in this particular result set either because of filtering
+        /// or because there are literally no more commits at the time of asking.
         /// </remarks>
-        public IEnumerable<SerializedEvent> Events { get; }
+        public IEnumerable<Commit> Commits { get; }
     }
 }

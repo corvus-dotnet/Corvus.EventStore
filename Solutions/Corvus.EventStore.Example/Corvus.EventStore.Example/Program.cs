@@ -175,12 +175,15 @@ namespace Corvus.EventStore.Example
                     {
                         try
                         {
-                            foreach (SerializedEvent @event in result.Events)
+                            foreach (Commit @commit in result.Commits)
                             {
-                                //// Process the result
-                                Console.ForegroundColor = ConsoleColor.Cyan;
-                                Console.WriteLine($"Seen event {@event.EventType}");
-                                Console.ResetColor();
+                                foreach (SerializedEvent @event in commit.Events)
+                                {
+                                    //// Process the result
+                                    Console.ForegroundColor = ConsoleColor.Cyan;
+                                    Console.WriteLine($"Seen event {@event.EventType}");
+                                    Console.ResetColor();
+                                }
                             }
 
                             token.ThrowIfCancellationRequested();
