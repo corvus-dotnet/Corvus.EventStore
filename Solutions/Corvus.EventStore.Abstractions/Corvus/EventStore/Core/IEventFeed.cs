@@ -5,6 +5,7 @@
 namespace Corvus.EventStore.Core
 {
     using System;
+    using System.Threading.Tasks;
 
     /// <summary>
     /// Implemented by types which provide a checkpointed
@@ -18,13 +19,13 @@ namespace Corvus.EventStore.Core
         /// <param name="filter">The filter for the event feed.</param>
         /// <param name="maxItems">The maximum number of items in the result set. <c>0 &lt;= result count &lt;= maxItems</c>.</param>
         /// <returns>A set of items from the feed.</returns>
-        EventFeedResult Get(EventFeedFilter filter, int maxItems);
+        ValueTask<EventFeedResult> Get(EventFeedFilter filter, int maxItems);
 
         /// <summary>
         /// Gets the filtered events from the given checkpoint.
         /// </summary>
         /// <param name="fromCheckpoint">The checkpoint from which to start reading the stream.</param>
         /// <returns>A set of items from the feed, and the next checkpoint.</returns>
-        EventFeedResult Get(ReadOnlyMemory<byte> fromCheckpoint);
+        ValueTask<EventFeedResult> Get(ReadOnlyMemory<byte> fromCheckpoint);
     }
 }

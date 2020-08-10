@@ -13,6 +13,17 @@ namespace Corvus.EventStore.Core
     public readonly struct EventFeedResult
     {
         /// <summary>
+        /// Initializes a new instance of the <see cref="EventFeedResult"/> struct.
+        /// </summary>
+        /// <param name="events">The <see cref="Events"/>.</param>
+        /// <param name="checkpoint">The <see cref="Checkpoint"/>.</param>
+        public EventFeedResult(in IEnumerable<SerializedEvent> events, ReadOnlyMemory<byte> checkpoint)
+        {
+            this.Events = events;
+            this.Checkpoint = checkpoint;
+        }
+
+        /// <summary>
         /// Gets the checkpoint for this result.
         /// </summary>
         /// <remarks>

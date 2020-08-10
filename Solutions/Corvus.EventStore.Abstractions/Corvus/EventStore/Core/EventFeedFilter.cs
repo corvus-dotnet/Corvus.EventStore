@@ -21,28 +21,31 @@ namespace Corvus.EventStore.Core
         /// The empty filter.
         /// </summary>
         public static readonly EventFeedFilter Empty = default;
+        private readonly ImmutableArray<Guid> aggregateIds;
+        private readonly ImmutableArray<string> partitionKeys;
+        private readonly ImmutableArray<string> eventTypes;
 
         private EventFeedFilter(ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys, ImmutableArray<string> eventTypes)
         {
-            this.AggregateIds = aggregateIds;
-            this.PartitionKeys = partitionKeys;
-            this.EventTypes = eventTypes;
+            this.aggregateIds = aggregateIds;
+            this.partitionKeys = partitionKeys;
+            this.eventTypes = eventTypes;
         }
 
         /// <summary>
         /// Gets the list of <see cref="PartitionKeys"/> whose events are to be included in the result set.
         /// </summary>
-        public ImmutableArray<string> PartitionKeys { get; }
+        public ImmutableArray<string> PartitionKeys => this.partitionKeys.IsDefault ? ImmutableArray<string>.Empty : this.partitionKeys;
 
         /// <summary>
         /// Gets the list of <see cref="AggregateIds"/> whose events are to be included in the result set.
         /// </summary>
-        public ImmutableArray<Guid> AggregateIds { get; }
+        public ImmutableArray<Guid> AggregateIds => this.aggregateIds.IsDefault ? ImmutableArray<Guid>.Empty : this.aggregateIds;
 
         /// <summary>
         /// Gets the list of <see cref="EventTypes"/> whose events are to be included in the result set.
         /// </summary>
-        public ImmutableArray<string> EventTypes { get; }
+        public ImmutableArray<string> EventTypes => this.eventTypes.IsDefault ? ImmutableArray<string>.Empty : this.eventTypes;
 
         /// <summary>
         /// Adds aggregate IDs to the filter.

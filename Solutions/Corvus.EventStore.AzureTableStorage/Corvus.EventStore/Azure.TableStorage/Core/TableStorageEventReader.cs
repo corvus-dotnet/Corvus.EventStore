@@ -90,7 +90,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             return this.ReadCommitsAsync(continuationToken.AggregateId, continuationToken.PartitionKey, continuationToken.FromSequenceNumber, continuationToken.ToSequenceNumber, continuationToken.MaxItems, cancellationToken);
         }
 
-        private readonly struct ContinuationToken
+        private struct ContinuationToken
         {
             public ContinuationToken(Guid aggregateId, string partitionKey, long fromSequenceNumber, long toSequenceNumber, int maxItems)
             {
@@ -101,15 +101,15 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                 this.PartitionKey = partitionKey;
             }
 
-            public long FromSequenceNumber { get; }
+            public long FromSequenceNumber { get; set; }
 
-            public long ToSequenceNumber { get; }
+            public long ToSequenceNumber { get; set; }
 
-            public int MaxItems { get; }
+            public int MaxItems { get; set; }
 
-            public Guid AggregateId { get; }
+            public Guid AggregateId { get; set; }
 
-            public string PartitionKey { get; }
+            public string PartitionKey { get; set; }
         }
     }
 }

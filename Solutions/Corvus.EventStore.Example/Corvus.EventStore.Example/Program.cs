@@ -8,6 +8,7 @@ namespace Corvus.EventStore.Example
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Linq;
+    using System.Threading;
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
     using Corvus.EventStore.Azure.TableStorage.Aggregates;
@@ -37,12 +38,13 @@ namespace Corvus.EventStore.Example
             Console.WriteLine("Running in-memory.");
             await RunInMemoryAsync().ConfigureAwait(false);
 
-            Console.WriteLine("Running with table storage.");
-            await RunWithTableStorageAsync().ConfigureAwait(false);
-
             Console.WriteLine("Running in memory with multiple iterations");
 
             await RunInMemoryMultipleIterationsAsync().ConfigureAwait(false);
+
+            Console.WriteLine("Running with table storage.");
+
+            await RunWithTableStorageAsync().ConfigureAwait(false);
 
             Console.WriteLine("Running with multi-partition table storage");
 
@@ -67,6 +69,9 @@ namespace Corvus.EventStore.Example
 
             // Using the Id as the partition key.
             string partitionKey = aggregateIdAsString;
+
+            var eventFeedCancellationTokenSource = new CancellationTokenSource();
+            Task eventFeedTask = StartEventFeed(inMemoryEventStore, eventFeedCancellationTokenSource.Token);
 
             // Create an aggregate reader for the configured store. This is cheap and can be done every time. It is stateless.
             // You would typically get this as a transient from the container. But as you can see you can just new everything up, too.
@@ -142,6 +147,53 @@ namespace Corvus.EventStore.Example
             {
                 Console.WriteLine($"Oh dear - {ex.Message}");
             }
+
+            Console.ReadKey();
+
+            try
+            {
+                eventFeedCancellationTokenSource.Cancel();
+                await eventFeedTask.ConfigureAwait(false);
+            }
+            catch
+            {
+                // The task cancelled exception.
+            }
+        }
+
+        private static Task StartEventFeed(InMemoryEventStore inMemoryEventStore, CancellationToken token)
+        {
+            return Task.Factory.StartNew(
+                async () =>
+                {
+                    var eventFeed = new InMemoryEventFeed(inMemoryEventStore);
+
+                    // Get the events one at a time without a filter
+                    EventFeedResult result = await eventFeed.Get(default, 1).ConfigureAwait(false);
+
+                    while (true)
+                    {
+                        try
+                        {
+                            foreach (SerializedEvent @event in result.Events)
+                            {
+                                //// Process the result
+                                Console.ForegroundColor = ConsoleColor.Cyan;
+                                Console.WriteLine($"Seen event {@event.EventType}");
+                                Console.ResetColor();
+                            }
+
+                            token.ThrowIfCancellationRequested();
+
+                            result = await eventFeed.Get(result.Checkpoint).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine(ex);
+                            throw;
+                        }
+                    }
+                });
         }
 
         private static async Task RunWithTableStorageAsync()
