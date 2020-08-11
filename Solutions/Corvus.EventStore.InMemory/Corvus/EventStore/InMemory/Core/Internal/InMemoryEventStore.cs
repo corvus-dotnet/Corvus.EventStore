@@ -12,6 +12,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
     using System.Text.Json;
     using System.Threading.Tasks;
     using Corvus.EventStore.Core;
+    using Corvus.Retry;
 
     /// <summary>
     /// Underlying store used by <see cref="InMemoryEventReader"/> and <see cref="InMemoryEventReader"/>.
@@ -22,11 +23,10 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         private readonly ConcurrentDictionary<Guid, CommitList> store =
             new ConcurrentDictionary<Guid, CommitList>();
 
-        /// <summary>
-        /// This represents the ordered set of commits across all aggregates. It is a lookup into the store.
-        /// </summary>
-        private object allStreamLock = new object();
-        private ImmutableList<(int, Guid, int)> allStream = ImmutableList<(int, Guid, int)>.Empty;
+        private ImmutableDictionary<Guid, long> aggregateIndices = ImmutableDictionary<Guid, long>.Empty;
+        private ImmutableList<(Guid, long)> allStream = ImmutableList<(Guid, long)>.Empty;
+
+        private ReliableTaskRunner? allStreamTask;
 
         /// <summary>
         /// Gets the feed from the beginning, given the specified filter.
@@ -136,44 +136,101 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                     return list.AddCommits(ImmutableArray.Create(commit));
                 });
 
-            // It is possible that our thread could be murdered between writing the event commit and
-            // writing the all stream. We would then have the even in the store, but not in this stream.
-            // That would not be highly desirable. A more robust implementation would use the separate process
-            // to write the all stream, and checkpoint where it had got to.
-            // There is also the issue that this could be interleaved with other updates for the aggregate (although
-            // the commit itself will appear as an atomic unit). This a general issue with the events as they may
-            // be delivered out-of-order or more than once, when you are no longer in the context of a single commit. You have
-            // to inspect the commit and determine if you are receving it "in order" or not.
-            lock (this.allStreamLock)
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Starts the all stream builder.
+        /// </summary>
+        internal void StartAllStreamBuilder()
+        {
+            if (this.allStreamTask is null)
             {
-                this.allStream = this.allStream.Add((this.allStream.Count, commit.AggregateId, eventIndex));
+                this.allStreamTask = ReliableTaskRunner.Run(token =>
+                {
+                    return Task.Factory.StartNew(
+                        () =>
+                        {
+                            while (true)
+                            {
+                                var allStream = this.allStream.ToBuilder();
+                                var aggregateIndices = this.aggregateIndices.ToBuilder();
+                                foreach (KeyValuePair<Guid, CommitList> item in this.store)
+                                {
+                                    CommitList list = this.store[item.Key];
+                                    if (this.aggregateIndices.TryGetValue(item.Key, out long index))
+                                    {
+                                        if (list.LastCommitSequenceNumber == index)
+                                        {
+                                            // We are up-to-date
+                                            continue;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        index = -1;
+                                    }
+
+                                    for (long i = index + 1; i <= list.LastCommitSequenceNumber; ++i)
+                                    {
+                                        allStream.Add((item.Key, i));
+                                    }
+
+                                    aggregateIndices[item.Key] = list.LastCommitSequenceNumber;
+                                }
+
+                                // Switch in the new all stream info
+                                this.allStream = allStream.ToImmutable();
+
+                                // It is conceivable that we could die between these two operations "for some reason"
+                                // in which case the in-memory store would be hosed.
+                                this.aggregateIndices = aggregateIndices.ToImmutable();
+
+                                if (token.IsCancellationRequested)
+                                {
+                                    return Task.CompletedTask;
+                                }
+                            }
+                        }, token);
+                });
+            }
+        }
+
+        /// <summary>
+        /// Stop the all stream builder if it was already running.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> which completes when the all stream builder has stopped.</returns>
+        internal Task StopAllStreamBuilderAsync()
+        {
+            if (this.allStreamTask is null)
+            {
+                return Task.CompletedTask;
             }
 
-            return Task.CompletedTask;
+            return this.allStreamTask.StopAsync();
         }
 
         private ValueTask<EventFeedResult> GetFeedCore(ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys, int maxItems, int initialCommitIndex)
         {
             // Because the allstream is an immutable list, we are safe to operate on it like this.
-            ImmutableList<(int, Guid, int)> localAllStream = this.allStream;
-            IEnumerable<(int, Guid, int)> stream = localAllStream.Skip(initialCommitIndex);
+            ImmutableList<(Guid, long)> localAllStream = this.allStream;
+            IEnumerable<(Guid, long)> stream = localAllStream.Skip(initialCommitIndex);
 
             if (aggregateIds.Any())
             {
-                stream = stream.Where(item => aggregateIds.Contains(this.store[item.Item2].Commits[item.Item3].AggregateId));
+                stream = stream.Where(item => aggregateIds.Contains(this.store[item.Item1].Commits[item.Item2].AggregateId));
             }
 
             if (partitionKeys.Any())
             {
-                stream = stream.Where(item => partitionKeys.Contains(this.store[item.Item2].Commits[item.Item3].PartitionKey));
+                stream = stream.Where(item => partitionKeys.Contains(this.store[item.Item1].Commits[item.Item2].PartitionKey));
             }
 
             ImmutableArray<Commit>.Builder builder = ImmutableArray.CreateBuilder<Commit>();
 
-            foreach ((int, Guid, int) current in stream)
+            foreach ((Guid, int) current in stream)
             {
-                Commit commit;
-                if (!this.store.TryGetValue(current.Item2, out CommitList aggregateCommitList) || !aggregateCommitList.Commits.TryGetValue(current.Item3, out commit))
+                if (!this.store.TryGetValue(current.Item1, out CommitList aggregateCommitList) || !aggregateCommitList.Commits.TryGetValue(current.Item2, out Commit commit))
                 {
                     throw new InvalidOperationException("The store `allStream` is out of sync with the individual aggregate stores, and should be rebuilt.");
                 }
@@ -186,7 +243,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
             }
 
             // If we got to the end of the list, point at the next commit (even if it doesn't exist yet).
-            return new ValueTask<EventFeedResult>(new EventFeedResult(builder.ToImmutable(), this.BuildCheckpoint(aggregateIds, partitionKeys, maxItems, localAllStream.Count)));
+            return new ValueTask<EventFeedResult>(new EventFeedResult(builder.ToImmutable(), this.BuildCheckpoint(aggregateIds, partitionKeys, maxItems, initialCommitIndex + builder.Count)));
         }
 
         private ReadOnlyMemory<byte> BuildCheckpoint(ImmutableArray<Guid> aggregateIds, ImmutableArray<string> partitionKeys, int maxItems, int commitIndex)
