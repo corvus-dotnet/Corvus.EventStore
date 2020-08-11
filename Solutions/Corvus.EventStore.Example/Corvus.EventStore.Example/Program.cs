@@ -368,6 +368,7 @@ namespace Corvus.EventStore.Example
 
             Task eventFeedTask = StartEventFeed(inMemoryEventStore, eventFeedCancellationTokenSource.Token, false, aggregateCount * iterationCount);
 
+            var sw1 = Stopwatch.StartNew();
             for (int i = 0; i < iterationCount; ++i)
             {
                 Console.WriteLine($"Iteration {i}");
@@ -398,12 +399,15 @@ namespace Corvus.EventStore.Example
                 }
             }
 
+            sw1.Stop();
+
             var swOuter = Stopwatch.StartNew();
 
             await eventFeedTask.ConfigureAwait(false);
 
             swOuter.Stop();
 
+            Console.WriteLine($"Wrote the events in {sw1.ElapsedMilliseconds / 1000.0} seconds.");
             Console.WriteLine($"The event feed caught up and stopped after a further {swOuter.ElapsedMilliseconds / 1000.0} seconds.");
         }
 
