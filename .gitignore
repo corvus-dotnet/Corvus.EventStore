@@ -334,4 +334,5 @@ coverage.cobertura.xml
 
 # VS Code config files
 /.vscode
-/Solutions/Corvus.Tenancy.Specs/local.settings.json
+
+**/local.settings.json

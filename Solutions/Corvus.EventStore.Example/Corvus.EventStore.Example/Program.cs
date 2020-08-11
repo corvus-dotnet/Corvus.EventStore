@@ -159,66 +159,6 @@ namespace Corvus.EventStore.Example
             }
         }
 
-        private static Task StartEventFeed(InMemoryEventStore inMemoryEventStore, CancellationToken token, bool writeEvents = true, int targetCommitCount = int.MaxValue)
-        {
-            return Task.Factory.StartNew(
-                async () =>
-                {
-                    int commitCount = 0;
-                    int eventCount = 0;
-                    InMemoryEventFeed? eventFeed = null;
-                    try
-                    {
-                        eventFeed = new InMemoryEventFeed(inMemoryEventStore);
-
-                        // Get the events 1000 sat a time without a filter
-                        EventFeedResult result = await eventFeed.Get(default, 10000).ConfigureAwait(false);
-
-                        while (commitCount < targetCommitCount)
-                        {
-                            try
-                            {
-                                foreach (Commit @commit in result.Commits)
-                                {
-                                    commitCount += 1;
-                                    foreach (SerializedEvent @event in commit.Events)
-                                    {
-                                        eventCount += 1;
-                                        if (writeEvents)
-                                        {
-                                            //// Process the result
-                                            Console.ForegroundColor = ConsoleColor.Cyan;
-                                            Console.WriteLine($"Seen event {@event.EventType}");
-                                            Console.ResetColor();
-                                        }
-                                    }
-                                }
-
-                                token.ThrowIfCancellationRequested();
-
-                                Console.WriteLine($"Commits: {commitCount}");
-
-                                result = await eventFeed.Get(result.Checkpoint).ConfigureAwait(false);
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine(ex);
-                                throw;
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        Console.WriteLine($"Seen {eventCount} events in {commitCount} commits");
-
-                        if (eventFeed != null)
-                        {
-                            await eventFeed.DisposeAsync().ConfigureAwait(false);
-                        }
-                    }
-                });
-        }
-
         private static async Task RunWithTableStorageAsync()
         {
             // Configure the database (in this case our cloud table factories)
@@ -400,8 +340,8 @@ namespace Corvus.EventStore.Example
             AggregateWriter<InMemoryEventWriter, InMemorySnapshotWriter> writer =
                 InMemoryAggregateWriter.GetInstance(inMemoryEventStore, inMemorySnapshotStore);
 
-            // This is the ID of our aggregate - imagine this came in from the request, for example.
-            Guid[] aggregateIds = Enumerable.Range(0, 1000)
+            const int aggregateCount = 1000000;
+            Guid[] aggregateIds = Enumerable.Range(0, aggregateCount)
                 .Select(i => Guid.NewGuid())
                 .ToArray();
 
@@ -411,18 +351,24 @@ namespace Corvus.EventStore.Example
 
             await aggregateIds.ForEachAtIndexAsync(async (aggregateId, index) =>
             {
-                Console.Write($".");
+                if (index % (aggregateCount / 100) == 0)
+                {
+                    Console.Write($".");
+                }
+
                 aggregates[index] = await ToDoList.ReadAsync(reader, aggregateId, aggregateId.ToString()).ConfigureAwait(false);
             }).ConfigureAwait(false);
 
             Console.WriteLine();
 
             var eventFeedCancellationTokenSource = new CancellationTokenSource();
-            Task eventFeedTask = StartEventFeed(inMemoryEventStore, eventFeedCancellationTokenSource.Token, false, 100000);
 
-            const int batchSize = 1000;
+            const int batchSize = 10000;
+            const int iterationCount = 2;
 
-            for (int i = 0; i < 100; ++i)
+            Task eventFeedTask = StartEventFeed(inMemoryEventStore, eventFeedCancellationTokenSource.Token, false, aggregateCount * iterationCount);
+
+            for (int i = 0; i < iterationCount; ++i)
             {
                 Console.WriteLine($"Iteration {i}");
                 for (int batch = 0; batch < aggregateIds.Length / batchSize; ++batch)
@@ -452,7 +398,80 @@ namespace Corvus.EventStore.Example
                 }
             }
 
+            var swOuter = Stopwatch.StartNew();
+
             await eventFeedTask.ConfigureAwait(false);
+
+            swOuter.Stop();
+
+            Console.WriteLine($"The event feed caught up and stopped after a further {swOuter.ElapsedMilliseconds / 1000.0} seconds.");
+        }
+
+        private static Task StartEventFeed(InMemoryEventStore inMemoryEventStore, CancellationToken token, bool writeEvents = true, int targetCommitCount = int.MaxValue)
+        {
+            return Task.Factory.StartNew(
+                async () =>
+                {
+                    int commitCount = 0;
+                    int eventCount = 0;
+                    InMemoryEventFeed? eventFeed = null;
+                    var sw = Stopwatch.StartNew();
+                    try
+                    {
+                        eventFeed = new InMemoryEventFeed(inMemoryEventStore);
+
+                        // Get the events 1000 sat a time without a filter
+                        EventFeedResult result = await eventFeed.Get(default, 10000).ConfigureAwait(false);
+
+                        while (commitCount < targetCommitCount)
+                        {
+                            try
+                            {
+                                int currentCommitCount = commitCount;
+
+                                foreach (Commit @commit in result.Commits)
+                                {
+                                    commitCount += 1;
+                                    foreach (SerializedEvent @event in commit.Events)
+                                    {
+                                        eventCount += 1;
+                                        if (writeEvents)
+                                        {
+                                            //// Process the result
+                                            Console.ForegroundColor = ConsoleColor.Cyan;
+                                            Console.WriteLine($"Seen event {@event.EventType}");
+                                            Console.ResetColor();
+                                        }
+                                    }
+                                }
+
+                                if (currentCommitCount != commitCount)
+                                {
+                                    Console.WriteLine($"Commits: {commitCount}");
+                                }
+
+                                token.ThrowIfCancellationRequested();
+
+                                result = await eventFeed.Get(result.Checkpoint).ConfigureAwait(false);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine(ex);
+                                throw;
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        sw.Stop();
+                        Console.WriteLine($"Seen {eventCount:N0} events in {commitCount:N0} commits in {sw.ElapsedMilliseconds / 1000.0} seconds");
+
+                        if (eventFeed != null)
+                        {
+                            await eventFeed.DisposeAsync().ConfigureAwait(false);
+                        }
+                    }
+                });
         }
     }
 }
