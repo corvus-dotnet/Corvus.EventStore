@@ -175,7 +175,7 @@ namespace Corvus.EventStore.Aggregates
                 return this;
             }
 
-            await writer.WriteCommitAsync(new Commit(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber + 1, DateTimeOffset.UtcNow.Ticks, this.UncommittedEvents)).ConfigureAwait(false);
+            await writer.WriteCommitAsync(new Commit(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber + 1, DateTimeOffset.Now.UtcTicks, this.UncommittedEvents)).ConfigureAwait(false);
             return new StatelessAggregate(this.AggregateId, this.PartitionKey, this.CommitSequenceNumber + 1, this.EventSequenceNumber, ImmutableArray<SerializedEvent>.Empty);
         }
 

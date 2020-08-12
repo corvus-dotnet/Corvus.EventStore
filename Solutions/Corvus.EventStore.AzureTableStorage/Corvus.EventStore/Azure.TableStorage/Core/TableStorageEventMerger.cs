@@ -21,7 +21,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         where TInputCloudTableFactory : IEventCloudTableFactory
         where TOutputCloudTableFactory : IAllStreamCloudTableFactory
     {
-        private static readonly long MinAzureUtcDateTicks = new DateTimeOffset(1601, 1, 1, 0, 0, 0, TimeSpan.Zero).Ticks;
+        private static readonly long MinAzureUtcDateTicks = new DateTimeOffset(1601, 1, 1, 0, 0, 0, TimeSpan.Zero).UtcTicks;
 
         private readonly ReliableTaskRunner mergeRunner;
 
@@ -149,7 +149,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                         result.PartitionKey = pk;
                                         result.RowKey = allStreamIndex.ToString("D21");
                                         allStreamIndex += 1;
-                                        checkpointTimestamps[i] = result.Timestamp.Ticks;
+                                        checkpointTimestamps[i] = result.Timestamp.UtcTicks;
 
                                         await outputTable.ExecuteAsync(TableOperation.InsertOrReplace(result)).ConfigureAwait(false);
 
