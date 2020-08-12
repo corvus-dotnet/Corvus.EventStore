@@ -383,11 +383,11 @@ namespace Corvus.EventStore.Example
                         TableStorageAggregateWriter.GetInstance(eventTableFactory, snapshotTableFactory);
 
                     // This is the ID of our aggregate - imagine this came in from the request, for example.
-                    Guid[] aggregateIds = Enumerable.Range(0, 100)
+                    Guid[] aggregateIds = Enumerable.Range(0, 1000)
                         .Select(i => Guid.NewGuid())
                         .ToArray();
 
-                    const int batchSize = 100;
+                    const int batchSize = 20;
                     const int initializationBatchSize = 10;
 
                     var aggregates = new ToDoList[aggregateIds.Length];
@@ -407,11 +407,11 @@ namespace Corvus.EventStore.Example
                     for (int i = 0; i < 2; ++i)
                     {
                         Console.WriteLine($"Iteration {i}");
-                        var sw = Stopwatch.StartNew();
                         for (int batch = 0; batch < aggregateIds.Length / batchSize; ++batch)
                         {
                             Console.WriteLine($"Batch {batch}");
 
+                            var sw = Stopwatch.StartNew();
                             var taskList = new List<Task<ToDoList>>();
 
                             for (int taskCount = 0; taskCount < batchSize; ++taskCount)
