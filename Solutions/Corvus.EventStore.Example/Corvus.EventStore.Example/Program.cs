@@ -23,6 +23,7 @@ namespace Corvus.EventStore.Example
     using Corvus.EventStore.InMemory.Snapshots.Internal;
     using Corvus.Extensions;
     using Corvus.SnapshotStore.Azure.TableStorage.ContainerFactories;
+    using Microsoft.Extensions.Configuration;
 
     /// <summary>
     /// Main program.
@@ -44,8 +45,17 @@ namespace Corvus.EventStore.Example
             ////Console.WriteLine("Running with table storage.");
             ////await RunWithTableStorageAsync().ConfigureAwait(false);
 
-            Console.WriteLine("Running with multi-partition table storage");
-            await RunWithMultiPartitionTableStorageAsync(true).ConfigureAwait(false);
+            ////Console.WriteLine("Running with multi-partition table storage");
+            ////await RunWithMultiPartitionTableStorageAsync(true).ConfigureAwait(false);
+
+            Console.WriteLine("Running with multi-partition table storage in Azure");
+
+            IConfigurationBuilder builder = new ConfigurationBuilder()
+                .AddJsonFile($"local.settings.json", true, true);
+
+            IConfigurationRoot config = builder.Build();
+
+            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), true).ConfigureAwait(false);
 
             Console.ReadKey();
         }
@@ -262,6 +272,95 @@ namespace Corvus.EventStore.Example
             var eventTableFactory = new PartitionedEventCloudTableFactory<DevelopmentEventCloudTableFactory>(eventTableFactoryP1, eventTableFactoryP2);
             var snapshotTableFactory = new DevelopmentSnapshotCloudTableFactory("corvussnapshots");
             var allStreamTableFactory = new DevelopmentAllStreamCloudTableFactory("corvusallstream");
+
+            var eventMerger = TableStorageEventMerger.From(eventTableFactory, allStreamTableFactory);
+
+            try
+            {
+                if (writeMore)
+                {
+                    // Example 1: Retrieve a new instance of an aggregate from the store. This type of aggregate is implemented over its own in-memory memento.
+                    // We Do things to it and commit it.
+
+                    // Create an aggregate reader for the configured store. This is cheap and can be done every time. It is stateless.
+                    // You would typically get this as a transient from the container. But as you can see you can just new everything up, too.
+                    // This happens to use an in memory reader for both the events and the snapshots, but you could (and frequently would) configure the AggregateReader with
+                    // different readers for events and snapshots so that they can go to different stores.
+                    AggregateReader<TableStorageEventReader, TableStorageSnapshotReader> reader =
+                        TableStorageAggregateReader.GetInstance(eventTableFactory, snapshotTableFactory);
+
+                    // Create an aggregate writer for the configured store. This is cheap and can be done every time. It is stateless.
+                    AggregateWriter<TableStorageEventWriter, TableStorageSnapshotWriter> writer =
+                        TableStorageAggregateWriter.GetInstance(eventTableFactory, snapshotTableFactory);
+
+                    // This is the ID of our aggregate - imagine this came in from the request, for example.
+                    Guid[] aggregateIds = Enumerable.Range(0, 100)
+                        .Select(i => Guid.NewGuid())
+                        .ToArray();
+
+                    const int batchSize = 100;
+                    const int initializationBatchSize = 10;
+
+                    var aggregates = new ToDoList[aggregateIds.Length];
+
+                    Console.Write("Initializing aggregates");
+
+                    for (int i = 0; i < (int)Math.Ceiling((double)aggregateIds.Length / initializationBatchSize); ++i)
+                    {
+                        IEnumerable<int> range = Enumerable.Range(initializationBatchSize * i, Math.Min(initializationBatchSize, aggregates.Length - (initializationBatchSize * i)));
+                        ToDoList[] results = await Task.WhenAll(range.Select(index => ToDoList.ReadAsync(reader, aggregateIds[index], aggregateIds[index].ToString()).AsTask()).ToList()).ConfigureAwait(false);
+                        results.CopyTo(aggregates, range.First());
+                        Console.Write(".");
+                    }
+
+                    Console.WriteLine();
+
+                    for (int i = 0; i < 2; ++i)
+                    {
+                        Console.WriteLine($"Iteration {i}");
+                        var sw = Stopwatch.StartNew();
+                        for (int batch = 0; batch < aggregateIds.Length / batchSize; ++batch)
+                        {
+                            Console.WriteLine($"Batch {batch}");
+
+                            var taskList = new List<Task<ToDoList>>();
+
+                            for (int taskCount = 0; taskCount < batchSize; ++taskCount)
+                            {
+                                ToDoList toDoList = aggregates[(batch * batchSize) + taskCount];
+                                toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
+                                toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "Another day, another item", "This is the item in question");
+                                ValueTask<ToDoList> task = toDoList.CommitAsync(writer);
+                                taskList.Add(task.AsTask());
+                            }
+
+                            ToDoList[] batchAggregates = await Task.WhenAll(taskList).ConfigureAwait(false);
+                            batchAggregates.CopyTo(aggregates, batch * batchSize);
+                            sw.Stop();
+                            Console.WriteLine(sw.ElapsedMilliseconds);
+                        }
+                    }
+                }
+
+                Console.ReadKey();
+            }
+            finally
+            {
+                await eventMerger.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+
+        private static async Task RunWithMultiPartitionTableStorageInAzureAsync(string connectionString, bool writeMore = true)
+        {
+            // Configure the database (in this case our cloud table factories)
+            // This would typically be done while you are setting up the container
+            // Here, we are setting up two separate physical partitions for the storage
+            // (in a real implementation this would typically be in two entirely different storage accounts to improve throughput)
+            var eventTableFactoryP1 = new EventCloudTableFactory(connectionString, "corvusevents1");
+            var eventTableFactoryP2 = new EventCloudTableFactory(connectionString, "corvusevents2");
+            var eventTableFactory = new PartitionedEventCloudTableFactory<EventCloudTableFactory>(eventTableFactoryP1, eventTableFactoryP2);
+            var snapshotTableFactory = new SnapshotCloudTableFactory(connectionString, "corvussnapshots");
+            var allStreamTableFactory = new AllStreamCloudTableFactory(connectionString, "corvusallstream");
 
             var eventMerger = TableStorageEventMerger.From(eventTableFactory, allStreamTableFactory);
 

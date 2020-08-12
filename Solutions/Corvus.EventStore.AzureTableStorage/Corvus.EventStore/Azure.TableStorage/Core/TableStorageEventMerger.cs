@@ -21,6 +21,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         where TInputCloudTableFactory : IEventCloudTableFactory
         where TOutputCloudTableFactory : IAllStreamCloudTableFactory
     {
+        private static readonly long MinAzureUtcDateTicks = new DateTimeOffset(1601, 1, 1, 0, 0, 0, TimeSpan.Zero).Ticks;
+
         private readonly ReliableTaskRunner mergeRunner;
 
         /// <summary>
@@ -72,7 +74,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                         TableResult tableResult = await outputTable.ExecuteAsync(operation).ConfigureAwait(false);
                         DynamicTableEntity checkpointsEntity = (DynamicTableEntity)tableResult.Result ?? new DynamicTableEntity("checkpoints", "latestinternal");
 
-                        long[] checkpointTimestamps = Enumerable.Repeat(0L, inputTables.Length).ToArray();
+                        long[] checkpointTimestamps = Enumerable.Repeat(MinAzureUtcDateTicks, inputTables.Length).ToArray();
 
                         long allStreamIndex = 0;
 
@@ -87,6 +89,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                         }
                         else
                         {
+                            checkpointsEntity = new DynamicTableEntity("checkpoints", "latestinternal");
+
                             // Set up the allstream index and checkpoints
                             for (int i = 0; i < checkpointTimestamps.Length; ++i)
                             {
@@ -109,7 +113,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                             {
                                 queries[i] =
                                     new TableQuery<DynamicTableEntity>()
-                                         .Where(TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThan, DateTimeOffset.FromUnixTimeMilliseconds(checkpointTimestamps[i])))
+                                         .Where(TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThan, new DateTimeOffset(checkpointTimestamps[i], TimeSpan.Zero)))
                                          .OrderBy("Timestamp");
                             }
 
@@ -145,7 +149,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                         result.PartitionKey = pk;
                                         result.RowKey = allStreamIndex.ToString("D21");
                                         allStreamIndex += 1;
-                                        checkpointTimestamps[i] = result.Timestamp.ToUnixTimeMilliseconds();
+                                        checkpointTimestamps[i] = result.Timestamp.Ticks;
 
                                         await outputTable.ExecuteAsync(TableOperation.InsertOrReplace(result)).ConfigureAwait(false);
 

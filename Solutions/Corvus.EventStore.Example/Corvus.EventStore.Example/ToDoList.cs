@@ -88,7 +88,7 @@ namespace Corvus.EventStore.Example
                     new Event<ToDoListOwnerSetEventPayload>(
                         ToDoListOwnerSetEventPayload.EventType,
                         this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        DateTimeOffset.UtcNow.Ticks,
                         new ToDoListOwnerSetEventPayload(owner))));
         }
 
@@ -106,7 +106,7 @@ namespace Corvus.EventStore.Example
                     new Event<ToDoListStartDateSetEventPayload>(
                         ToDoListStartDateSetEventPayload.EventType,
                         this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        DateTimeOffset.UtcNow.Ticks,
                         new ToDoListStartDateSetEventPayload(startDate))));
         }
 
@@ -131,7 +131,7 @@ namespace Corvus.EventStore.Example
                     new Event<ToDoItemAddedEventPayload>(
                         ToDoItemAddedEventPayload.EventType,
                         this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        DateTimeOffset.UtcNow.Ticks,
                         new ToDoItemAddedEventPayload(id, title, description))));
         }
 
@@ -154,7 +154,7 @@ namespace Corvus.EventStore.Example
                     new Event<ToDoItemRemovedEventPayload>(
                         ToDoItemRemovedEventPayload.EventType,
                         this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                        DateTimeOffset.UtcNow.Ticks,
                         new ToDoItemRemovedEventPayload(id))));
         }
 
@@ -171,7 +171,7 @@ namespace Corvus.EventStore.Example
             return new ToDoList(
                 await writer.CommitAsync(
                     this.aggregate,
-                    DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    DateTimeOffset.UtcNow.Ticks,
                     NeverSnapshotPolicy<AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>>.Instance).ConfigureAwait(false));
         }
     }

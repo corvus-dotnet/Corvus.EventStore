@@ -1,2 +1,5 @@
 {
+  "ConnectionStrings": {
+    "TableStorageConnectionString": "DefaultEndpointsProtocol=https;AccountName=mwaeventsource;AccountKey=eNsghIqJd0nL79DYWzxp7CzYBWHhX6uxso4wG6DGXEgxLoO4rsqaQJEzQ4n8Eg6SWcwmKX/WAttmYdPQaJgpsw==;EndpointSuffix=core.windows.net"
+  }
 }
