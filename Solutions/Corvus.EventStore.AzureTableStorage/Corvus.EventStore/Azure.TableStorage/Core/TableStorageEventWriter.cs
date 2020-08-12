@@ -34,7 +34,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             commitEntity.Properties["Commit" + nameof(Commit.PartitionKey)] = new EntityProperty(commit.PartitionKey);
             commitEntity.Properties["Commit" + nameof(Commit.SequenceNumber)] = new EntityProperty(commit.SequenceNumber);
             commitEntity.Properties["Commit" + nameof(Commit.Timestamp)] = new EntityProperty(commit.Timestamp);
-            commitEntity.Properties["Commit" + nameof(Commit.Events)] = new EntityProperty(Utf8JsonEventListSerializer.SerializeEventList(commit.Events));
+            commitEntity.Properties["Commit" + nameof(Commit.Events)] = new EntityProperty(Utf8JsonEventListSerializer.SerializeEventListToString(commit.Events));
 
             CloudTable table = this.cloudTableFactory.GetTable(commit.AggregateId, commit.PartitionKey);
 

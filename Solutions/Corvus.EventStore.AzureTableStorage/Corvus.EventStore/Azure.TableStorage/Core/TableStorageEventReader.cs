@@ -64,12 +64,18 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                         commitEntity.Properties["Commit" + nameof(Commit.Timestamp)].Int64Value!.Value,
                         events);
                     resultBuilder.Add(commit);
+
+                    if (resultBuilder.Count == maxItems)
+                    {
+                        break;
+                    }
+
                     cancellationToken.ThrowIfCancellationRequested();
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
             }
-            while (!(continuationToken is null));
+            while (resultBuilder.Count < maxItems && !(continuationToken is null));
 
             if (resultBuilder.Count == maxItems)
             {

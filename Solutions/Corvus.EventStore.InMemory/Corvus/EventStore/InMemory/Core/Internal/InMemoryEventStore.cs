@@ -151,6 +151,9 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                     return Task.Factory.StartNew(
                         () =>
                         {
+                            this.allStream = ImmutableList<(Guid, long)>.Empty;
+                            this.aggregateIndices = ImmutableDictionary<Guid, long>.Empty;
+
                             while (true)
                             {
                                 var allStream = this.allStream.ToBuilder();
@@ -183,7 +186,8 @@ namespace Corvus.EventStore.InMemory.Core.Internal
                                 this.allStream = allStream.ToImmutable();
 
                                 // It is conceivable that we could die between these two operations "for some reason"
-                                // in which case the in-memory store would be hosed.
+                                // in which case the in-memory store would be hosed, and it would be built from scratch
+                                // when this thread restarts.
                                 this.aggregateIndices = aggregateIndices.ToImmutable();
 
                                 if (token.IsCancellationRequested)
@@ -214,28 +218,35 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         {
             // Because the allstream is an immutable list, we are safe to operate on it like this.
             ImmutableList<(Guid, long)> localAllStream = this.allStream;
-            IEnumerable<(Guid, long)> stream = localAllStream.Skip(initialCommitIndex);
 
-            if (aggregateIds.Any())
-            {
-                stream = stream.Where(item => aggregateIds.Contains(this.store[item.Item1].Commits[item.Item2].AggregateId));
-            }
-
-            if (partitionKeys.Any())
-            {
-                stream = stream.Where(item => partitionKeys.Contains(this.store[item.Item1].Commits[item.Item2].PartitionKey));
-            }
+            bool hasAggregateIds = aggregateIds.Any();
+            bool hasParitionKeys = partitionKeys.Any();
 
             ImmutableArray<Commit>.Builder builder = ImmutableArray.CreateBuilder<Commit>();
 
-            foreach ((Guid, int) current in stream)
+            int commitIndex = initialCommitIndex;
+            while (commitIndex < localAllStream.Count)
             {
+                (Guid, long) current = localAllStream[commitIndex];
                 if (!this.store.TryGetValue(current.Item1, out CommitList aggregateCommitList) || !aggregateCommitList.Commits.TryGetValue(current.Item2, out Commit commit))
                 {
                     throw new InvalidOperationException("The store `allStream` is out of sync with the individual aggregate stores, and should be rebuilt.");
                 }
 
+                commitIndex++;
+
+                if (hasAggregateIds && !aggregateIds.Contains(commit.AggregateId))
+                {
+                    continue;
+                }
+
+                if (hasParitionKeys && !partitionKeys.Contains(commit.PartitionKey))
+                {
+                    continue;
+                }
+
                 builder.Add(commit);
+
                 if (builder.Count == maxItems)
                 {
                     break;

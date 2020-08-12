@@ -39,6 +39,16 @@ namespace Corvus.EventStore.Azure.TableStorage.Core.Internal
             return JsonSerializer.SerializeToUtf8Bytes(events, Options);
         }
 
+        /// <summary>
+        /// Serializes the event list.
+        /// </summary>
+        /// <param name="events">The events to serialize.</param>
+        /// <returns>The Utf8 binary encoded Json representation of the list.</returns>
+        public static string SerializeEventListToString(ImmutableArray<SerializedEvent> events)
+        {
+            return JsonSerializer.Serialize(events, Options);
+        }
+
         private static JsonSerializerOptions GetDefaultOptions()
         {
             var options = new JsonSerializerOptions();
