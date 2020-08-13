@@ -21,6 +21,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         where TInputCloudTableFactory : IEventCloudTableFactory
         where TOutputCloudTableFactory : IAllStreamCloudTableFactory
     {
+        private const int MaxBatchSize = 99;
+
         private static readonly long MinAzureUtcDateTicks = new DateTimeOffset(1601, 1, 1, 0, 0, 0, TimeSpan.Zero).UtcTicks;
 
         private readonly ReliableTaskRunner mergeRunner;
@@ -58,8 +60,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         /// </summary>
         private static ReliableTaskRunner Start(TInputCloudTableFactory inputFactory, TOutputCloudTableFactory outputFactory)
         {
-            // We could choose a PK to batch by e.g. "today"
             string pk = "allstreamitems";
+            string rk = "latestinternalcheckpoint";
 
             ImmutableArray<CloudTable> inputTables = inputFactory.GetTables();
             CloudTable outputTable = outputFactory.GetTable();
@@ -70,9 +72,9 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                     async () =>
                     {
                         // First, load the last checkpoint
-                        var operation = TableOperation.Retrieve<DynamicTableEntity>("checkpoints", "latestinternal");
+                        var operation = TableOperation.Retrieve<DynamicTableEntity>(pk, rk);
                         TableResult tableResult = await outputTable.ExecuteAsync(operation).ConfigureAwait(false);
-                        DynamicTableEntity checkpointsEntity = (DynamicTableEntity)tableResult.Result ?? new DynamicTableEntity("checkpoints", "latestinternal");
+                        DynamicTableEntity checkpointsEntity = (DynamicTableEntity)tableResult.Result ?? new DynamicTableEntity(pk, rk);
 
                         long[] checkpointTimestamps = Enumerable.Repeat(MinAzureUtcDateTicks, inputTables.Length).ToArray();
 
@@ -89,7 +91,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                         }
                         else
                         {
-                            checkpointsEntity = new DynamicTableEntity("checkpoints", "latestinternal");
+                            checkpointsEntity = new DynamicTableEntity(pk, rk);
 
                             // Set up the allstream index and checkpoints
                             for (int i = 0; i < checkpointTimestamps.Length; ++i)
@@ -116,6 +118,10 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                          .Where(TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThan, new DateTimeOffset(checkpointTimestamps[i], TimeSpan.Zero)))
                                          .OrderBy("Timestamp");
                             }
+
+                            var batch = new TableBatchOperation();
+                            int batchCount = 0;
+                            Task? batchTask = null;
 
                             do
                             {
@@ -150,14 +156,28 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                         result.RowKey = allStreamIndex.ToString("D21");
                                         allStreamIndex += 1;
                                         checkpointTimestamps[i] = result.Timestamp.UtcTicks;
+                                        var insertOperation = TableOperation.InsertOrReplace(result);
 
-                                        await outputTable.ExecuteAsync(TableOperation.InsertOrReplace(result)).ConfigureAwait(false);
+                                        batch.Add(insertOperation);
+                                        batchCount++;
+                                        if (batchCount == MaxBatchSize)
+                                        {
+                                            // Add an extra item to the last batch to update the checkpoint.
+                                            checkpointsEntity.Properties[$"checkpointtimestamp{i}"] = new EntityProperty(checkpointTimestamps[i]);
+                                            checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
+                                            var writeOperation = TableOperation.InsertOrReplace(checkpointsEntity);
+                                            batch.Add(writeOperation);
+                                            if (batchTask != null)
+                                            {
+                                                // Wait for the previous insert to complete.
+                                                await batchTask.ConfigureAwait(false);
+                                            }
 
-                                        // Add an extra item to the last batch to update the checkpoint.
-                                        checkpointsEntity.Properties[$"checkpointtimestamp{i}"] = new EntityProperty(checkpointTimestamps[i]);
-                                        checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
-                                        var writeOperation = TableOperation.InsertOrReplace(checkpointsEntity);
-                                        await outputTable.ExecuteAsync(writeOperation).ConfigureAwait(false);
+                                            // Stash it away and carry on.
+                                            batchTask = outputTable.ExecuteBatchAsync(batch);
+                                            batch = new TableBatchOperation();
+                                            batchCount = 0;
+                                        }
                                     }
                                 }
 
@@ -169,6 +189,25 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                 }
                             }
                             while (currentTokens.Any(currentToken => currentToken != null));
+
+                            if (batchTask != null)
+                            {
+                                // Wait for the previous insert to complete.
+                                await batchTask.ConfigureAwait(false);
+
+                                if (batch.Count > 0)
+                                {
+                                    for (int i = 0; i < checkpointTimestamps.Length; ++i)
+                                    {
+                                        checkpointsEntity.Properties[$"checkpointtimestamp{i}"] = new EntityProperty(checkpointTimestamps[i]);
+                                    }
+
+                                    checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
+                                    var writeOperation = TableOperation.InsertOrReplace(checkpointsEntity);
+                                    batch.Add(writeOperation);
+                                    await outputTable.ExecuteBatchAsync(batch).ConfigureAwait(false);
+                                }
+                            }
                         }
                     }, token);
             });
