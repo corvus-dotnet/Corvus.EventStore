@@ -45,17 +45,17 @@ namespace Corvus.EventStore.Example
             ////Console.WriteLine("Running with table storage.");
             ////await RunWithTableStorageAsync().ConfigureAwait(false);
 
-            Console.WriteLine("Running with multi-partition table storage");
-            await RunWithMultiPartitionTableStorageAsync(false).ConfigureAwait(false);
+            ////Console.WriteLine("Running with multi-partition table storage");
+            ////await RunWithMultiPartitionTableStorageAsync(false).ConfigureAwait(false);
 
-            ////Console.WriteLine("Running with multi-partition table storage in Azure");
+            Console.WriteLine("Running with multi-partition table storage in Azure");
 
-            ////IConfigurationBuilder builder = new ConfigurationBuilder()
-            ////    .AddJsonFile($"local.settings.json", true, true);
+            IConfigurationBuilder builder = new ConfigurationBuilder()
+                .AddJsonFile($"local.settings.json", true, true);
 
-            ////IConfigurationRoot config = builder.Build();
+            IConfigurationRoot config = builder.Build();
 
-            ////await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), true).ConfigureAwait(false);
+            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), true).ConfigureAwait(false);
 
             Console.ReadKey();
         }

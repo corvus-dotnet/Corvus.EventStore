@@ -47,7 +47,15 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             {
                 if (ex.RequestInformation.HttpStatusCode == 409)
                 {
-                    throw new ConcurrencyException($"Unable to write the commit for aggregateID {commit.AggregateId} with sequence number {commit.SequenceNumber}.", ex);
+                    TableResult result = await table.ExecuteAsync(TableOperation.Retrieve<DynamicTableEntity>(commitEntity.PartitionKey, commitEntity.RowKey)).ConfigureAwait(false);
+                    var storedEntity = (DynamicTableEntity)result.Result;
+                    if (storedEntity.Properties["Commit" + nameof(Commit.Timestamp)].Int64Value != commitEntity.Properties["Commit" + nameof(Commit.Timestamp)].Int64Value ||
+                        storedEntity.Properties["Commit" + nameof(Commit.Events)].StringValue != commitEntity.Properties["Commit" + nameof(Commit.Events)].StringValue)
+                    {
+                        throw new ConcurrencyException($"Unable to write the commit for aggregateID {commit.AggregateId} with sequence number {commit.SequenceNumber}.", ex);
+                    }
+
+                    // We actually stored it successfully, so just continue.
                 }
 
                 // Rethrow if we had a general storage exception.
