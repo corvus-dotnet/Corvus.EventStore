@@ -6,6 +6,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 {
     using System;
     using System.Collections.Immutable;
+    using System.Diagnostics;
     using System.Linq;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
@@ -66,134 +67,138 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             ImmutableArray<CloudTable> inputTables = inputFactory.GetTables();
             CloudTable outputTable = outputFactory.GetTable();
 
-            return ReliableTaskRunner.Run(token =>
-            {
-                return Task.Factory.StartNew(
-                    async () =>
-                    {
-                        // First, load the last checkpoint
-                        var operation = TableOperation.Retrieve<DynamicTableEntity>(pk, rk);
-                        TableResult tableResult = await outputTable.ExecuteAsync(operation).ConfigureAwait(false);
-                        DynamicTableEntity checkpointsEntity = (DynamicTableEntity)tableResult.Result ?? new DynamicTableEntity(pk, rk);
-
-                        long[] checkpointTimestamps = Enumerable.Repeat(MinAzureUtcDateTicks, inputTables.Length).ToArray();
-
-                        long allStreamIndex = 0;
-
-                        if (tableResult.HttpStatusCode == 200)
+            return ReliableTaskRunner.Run(
+                token =>
+                {
+                    return Task.Factory.StartNew(
+                        async () =>
                         {
-                            for (int i = 0; i < checkpointTimestamps.Length; ++i)
+                            // First, load the last checkpoint
+                            var operation = TableOperation.Retrieve<DynamicTableEntity>(pk, rk);
+                            TableResult tableResult = await outputTable.ExecuteAsync(operation).ConfigureAwait(false);
+                            DynamicTableEntity checkpointsEntity = (DynamicTableEntity)tableResult.Result ?? new DynamicTableEntity(pk, rk);
+
+                            long[] checkpointTimestamps = Enumerable.Repeat(MinAzureUtcDateTicks, inputTables.Length).ToArray();
+
+                            long allStreamIndex = 0;
+
+                            if (tableResult.HttpStatusCode == 200)
                             {
-                                checkpointTimestamps[i] = checkpointsEntity.Properties[$"checkpointtimestamp{i}"].Int64Value!.Value;
+                                for (int i = 0; i < checkpointTimestamps.Length; ++i)
+                                {
+                                    checkpointTimestamps[i] = checkpointsEntity.Properties[$"checkpointtimestamp{i}"].Int64Value!.Value;
+                                }
+
+                                allStreamIndex = checkpointsEntity.Properties["allStreamIndex"].Int64Value!.Value;
+                            }
+                            else
+                            {
+                                checkpointsEntity = new DynamicTableEntity(pk, rk);
+
+                                // Set up the allstream index and checkpoints
+                                for (int i = 0; i < checkpointTimestamps.Length; ++i)
+                                {
+                                    checkpointsEntity.Properties[$"checkpointtimestamp{i}"] = new EntityProperty(checkpointTimestamps[i]);
+                                }
+
+                                checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
                             }
 
-                            allStreamIndex = checkpointsEntity.Properties["allStreamIndex"].Int64Value!.Value;
-                        }
-                        else
-                        {
-                            checkpointsEntity = new DynamicTableEntity(pk, rk);
+                            var queries = new TableQuery<DynamicTableEntity>[inputTables.Length];
+                            var currentTokens = new TableContinuationToken?[inputTables.Length];
+                            var tasks = new Task<TableQuerySegment<DynamicTableEntity>?>[inputTables.Length];
 
-                            // Set up the allstream index and checkpoints
-                            for (int i = 0; i < checkpointTimestamps.Length; ++i)
+                            while (true)
                             {
-                                checkpointsEntity.Properties[$"checkpointtimestamp{i}"] = new EntityProperty(checkpointTimestamps[i]);
-                            }
+                                bool firstTime = true;
 
-                            checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
-                        }
-
-                        var queries = new TableQuery<DynamicTableEntity>[inputTables.Length];
-                        var currentTokens = new TableContinuationToken?[inputTables.Length];
-                        var tasks = new Task<TableQuerySegment<DynamicTableEntity>?>[inputTables.Length];
-
-                        while (true)
-                        {
-                            bool firstTime = true;
-
-                            // Create the queries for each of the tables in the input stream.
-                            for (int i = 0; i < queries.Length; ++i)
-                            {
-                                queries[i] =
-                                    new TableQuery<DynamicTableEntity>()
-                                         .Where(TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThan, new DateTimeOffset(checkpointTimestamps[i], TimeSpan.Zero)))
-                                         .OrderBy("Timestamp");
-                            }
-
-                            var batch = new TableBatchOperation();
-                            int batchCount = 0;
-                            Task? batchTask = null;
-
-                            do
-                            {
-                                // Execute the queries
+                                // Create the queries for each of the tables in the input stream.
                                 for (int i = 0; i < queries.Length; ++i)
                                 {
-                                    if (firstTime || currentTokens[i] != null)
-                                    {
-                                        tasks[i] = inputTables[i].ExecuteQuerySegmentedAsync(queries[i], currentTokens[i]);
-                                    }
-                                    else
-                                    {
-                                        tasks[i] = Task.FromResult<TableQuerySegment<DynamicTableEntity>?>(null);
-                                    }
+                                    queries[i] =
+                                        new TableQuery<DynamicTableEntity>()
+                                             .Where(TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThan, new DateTimeOffset(checkpointTimestamps[i], TimeSpan.Zero)))
+                                             .OrderBy("Timestamp");
                                 }
 
-                                TableQuerySegment<DynamicTableEntity>?[] segments = await Task.WhenAll(tasks).ConfigureAwait(false);
+                                var batch = new TableBatchOperation();
+                                int batchCount = 0;
+                                Task? batchTask = null;
 
-                                for (int i = 0; i < segments.Length; ++i)
+                                do
                                 {
-                                    TableQuerySegment<DynamicTableEntity>? segment = segments[i];
-                                    if (segment is null)
+                                    // Execute the queries
+                                    for (int i = 0; i < queries.Length; ++i)
                                     {
-                                        currentTokens[i] = null;
-                                        continue;
-                                    }
-
-                                    currentTokens[i] = segment.ContinuationToken;
-                                    foreach (DynamicTableEntity result in segment.Results.OrderBy(r => r.Timestamp))
-                                    {
-                                        result.PartitionKey = pk;
-                                        result.RowKey = allStreamIndex.ToString("D21");
-                                        allStreamIndex += 1;
-                                        checkpointTimestamps[i] = result.Timestamp.UtcTicks;
-                                        var insertOperation = TableOperation.InsertOrReplace(result);
-
-                                        batch.Add(insertOperation);
-                                        batchCount++;
-                                        if (batchCount == MaxBatchSize)
+                                        if (firstTime || currentTokens[i] != null)
                                         {
-                                            // Add an extra item to the last batch to update the checkpoint.
-                                            checkpointsEntity.Properties[$"checkpointtimestamp{i}"] = new EntityProperty(checkpointTimestamps[i]);
-                                            checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
-                                            var writeOperation = TableOperation.InsertOrReplace(checkpointsEntity);
-                                            batch.Add(writeOperation);
-                                            if (batchTask != null)
-                                            {
-                                                // Wait for the previous insert to complete.
-                                                await batchTask.ConfigureAwait(false);
-                                            }
-
-                                            // Stash it away and carry on.
-                                            batchTask = outputTable.ExecuteBatchAsync(batch);
-                                            batch = new TableBatchOperation();
-                                            batchCount = 0;
+                                            tasks[i] = inputTables[i].ExecuteQuerySegmentedAsync(queries[i], currentTokens[i]);
+                                        }
+                                        else
+                                        {
+                                            tasks[i] = Task.FromResult<TableQuerySegment<DynamicTableEntity>?>(null);
                                         }
                                     }
+
+                                    var sw = Stopwatch.StartNew();
+                                    TableQuerySegment<DynamicTableEntity>?[] segments = await Task.WhenAll(tasks).ConfigureAwait(false);
+                                    sw.Stop();
+
+                                    for (int i = 0; i < segments.Length; ++i)
+                                    {
+                                        TableQuerySegment<DynamicTableEntity>? segment = segments[i];
+                                        if (segment is null)
+                                        {
+                                            currentTokens[i] = null;
+                                            continue;
+                                        }
+
+                                        currentTokens[i] = segment.ContinuationToken;
+                                        foreach (DynamicTableEntity result in segment.Results.OrderBy(r => r.Timestamp))
+                                        {
+                                            result.PartitionKey = pk;
+                                            result.RowKey = allStreamIndex.ToString("D21");
+                                            allStreamIndex += 1;
+                                            checkpointTimestamps[i] = result.Timestamp.UtcTicks;
+                                            var insertOperation = TableOperation.InsertOrReplace(result);
+
+                                            batch.Add(insertOperation);
+                                            batchCount++;
+                                            if (batchCount == MaxBatchSize)
+                                            {
+                                                // Add an extra item to the last batch to update the checkpoint.
+                                                checkpointsEntity.Properties[$"checkpointtimestamp{i}"] = new EntityProperty(checkpointTimestamps[i]);
+                                                checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
+                                                var writeOperation = TableOperation.InsertOrReplace(checkpointsEntity);
+                                                batch.Add(writeOperation);
+                                                if (batchTask != null)
+                                                {
+                                                    // Wait for the previous insert to complete.
+                                                    await batchTask.ConfigureAwait(false);
+                                                }
+
+                                                // Stash it away and carry on.
+                                                batchTask = outputTable.ExecuteBatchAsync(batch);
+                                                batch = new TableBatchOperation();
+                                                batchCount = 0;
+                                            }
+                                        }
+                                    }
+
+                                    firstTime = false;
+
+                                    if (token.IsCancellationRequested)
+                                    {
+                                        return Task.CompletedTask;
+                                    }
                                 }
+                                while (currentTokens.Any(currentToken => currentToken != null));
 
-                                firstTime = false;
-
-                                if (token.IsCancellationRequested)
+                                if (batchTask != null)
                                 {
-                                    return Task.CompletedTask;
+                                    // Wait for the previous insert to complete.
+                                    await batchTask.ConfigureAwait(false);
                                 }
-                            }
-                            while (currentTokens.Any(currentToken => currentToken != null));
-
-                            if (batchTask != null)
-                            {
-                                // Wait for the previous insert to complete.
-                                await batchTask.ConfigureAwait(false);
 
                                 if (batch.Count > 0)
                                 {
@@ -208,9 +213,9 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                     await outputTable.ExecuteBatchAsync(batch).ConfigureAwait(false);
                                 }
                             }
-                        }
-                    }, token);
-            });
+                        }, token);
+                },
+                new Retry.Policies.AnyExceptionPolicy());
         }
     }
 

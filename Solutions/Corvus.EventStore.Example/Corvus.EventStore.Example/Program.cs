@@ -369,7 +369,10 @@ namespace Corvus.EventStore.Example
             // (in a real implementation this would typically be in two entirely different storage accounts to improve throughput)
             var eventTableFactoryP1 = new EventCloudTableFactory(connectionString, "corvusevents1");
             var eventTableFactoryP2 = new EventCloudTableFactory(connectionString, "corvusevents2");
-            var eventTableFactory = new PartitionedEventCloudTableFactory<EventCloudTableFactory>(eventTableFactoryP1, eventTableFactoryP2);
+            var eventTableFactoryP3 = new EventCloudTableFactory(connectionString, "corvusevents3");
+            var eventTableFactoryP4 = new EventCloudTableFactory(connectionString, "corvusevents4");
+            var eventTableFactoryP5 = new EventCloudTableFactory(connectionString, "corvusevents4");
+            var eventTableFactory = new PartitionedEventCloudTableFactory<EventCloudTableFactory>(eventTableFactoryP1, eventTableFactoryP2, eventTableFactoryP3, eventTableFactoryP4, eventTableFactoryP5);
             var snapshotTableFactory = new SnapshotCloudTableFactory(connectionString, "corvussnapshots");
             var allStreamTableFactory = new AllStreamCloudTableFactory(connectionString, "corvusallstream");
 
@@ -394,13 +397,13 @@ namespace Corvus.EventStore.Example
                         TableStorageAggregateWriter.GetInstance(eventTableFactory, snapshotTableFactory);
 
                     // This is the ID of our aggregate - imagine this came in from the request, for example.
-                    Guid[] aggregateIds = Enumerable.Range(0, 1000000)
+                    Guid[] aggregateIds = Enumerable.Range(0, 625)
                         .Select(i => Guid.NewGuid())
                         .ToArray();
 
-                    const int batchSize = 1000;
-                    const int initializationBatchSize = 1000;
-                    const int iterations = 2;
+                    const int batchSize = 625;
+                    const int initializationBatchSize = 625;
+                    const int iterations = 100;
 
                     var aggregates = new ToDoList[aggregateIds.Length];
 
@@ -436,6 +439,8 @@ namespace Corvus.EventStore.Example
 
                     for (int i = 0; i < iterations; ++i)
                     {
+                        DateTimeOffset startTime = DateTimeOffset.Now;
+
                         Console.WriteLine($"Iteration {i}");
                         for (int batch = 0; batch < aggregateIds.Length / batchSize; ++batch)
                         {
@@ -447,7 +452,7 @@ namespace Corvus.EventStore.Example
                             {
                                 ToDoList toDoList = aggregates[(batch * batchSize) + taskCount];
                                 toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
-                                toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "Another day, another item", "This is the item in question");
+                                ////toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "Another day, another item", "This is the item in question");
                                 ValueTask<ToDoList> task = toDoList.CommitAsync(writer);
                                 taskList[taskCount] = task.AsTask();
                             }
@@ -455,7 +460,16 @@ namespace Corvus.EventStore.Example
                             ToDoList[] batchAggregates = await Task.WhenAll(taskList).ConfigureAwait(false);
                             batchAggregates.CopyTo(aggregates, batch * batchSize);
                             sw.Stop();
+
                             Console.WriteLine(sw.ElapsedMilliseconds);
+                        }
+
+                        double elapsed = (DateTimeOffset.Now - startTime).TotalMilliseconds;
+
+                        // Rate limit to ~1 per second per node
+                        if (elapsed < 900.0)
+                        {
+                            await Task.Delay(900 - (int)elapsed).ConfigureAwait(false);
                         }
                     }
 
@@ -467,7 +481,14 @@ namespace Corvus.EventStore.Example
             }
             finally
             {
-                await eventMerger.DisposeAsync().ConfigureAwait(false);
+                try
+                {
+                    await eventMerger.DisposeAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
+                }
             }
         }
 

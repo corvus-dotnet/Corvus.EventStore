@@ -56,6 +56,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                     }
 
                     // We actually stored it successfully, so just continue.
+                    return;
                 }
 
                 // Rethrow if we had a general storage exception.
