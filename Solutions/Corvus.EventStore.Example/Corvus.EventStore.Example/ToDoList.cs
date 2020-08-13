@@ -29,6 +29,16 @@ namespace Corvus.EventStore.Example
         }
 
         /// <summary>
+        /// Gets the aggregate ID for the todo list.
+        /// </summary>
+        public Guid AggregateId => this.aggregate.AggregateId;
+
+        /// <summary>
+        /// Gets the partition key for the todo list.
+        /// </summary>
+        public string PartitionKey => this.aggregate.PartitionKey;
+
+        /// <summary>
         /// Reads an instance of a to-do list, optionally to the specified commit sequence number.
         /// </summary>
         /// <typeparam name="TReader">The type of the <see cref="IAggregateReader"/>.</typeparam>

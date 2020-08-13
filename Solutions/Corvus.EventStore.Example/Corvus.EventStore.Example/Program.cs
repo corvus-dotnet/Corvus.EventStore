@@ -55,7 +55,7 @@ namespace Corvus.EventStore.Example
 
             IConfigurationRoot config = builder.Build();
 
-            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), true).ConfigureAwait(false);
+            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), true, true).ConfigureAwait(false);
 
             Console.ReadKey();
         }
@@ -361,7 +361,7 @@ namespace Corvus.EventStore.Example
             }
         }
 
-        private static async Task RunWithMultiPartitionTableStorageInAzureAsync(string connectionString, bool writeMore = true)
+        private static async Task RunWithMultiPartitionTableStorageInAzureAsync(string connectionString, bool writeMore = true, bool startEventMerger = true)
         {
             // Configure the database (in this case our cloud table factories)
             // This would typically be done while you are setting up the container
@@ -376,7 +376,12 @@ namespace Corvus.EventStore.Example
             var snapshotTableFactory = new SnapshotCloudTableFactory(connectionString, "corvussnapshots");
             var allStreamTableFactory = new AllStreamCloudTableFactory(connectionString, "corvusallstream");
 
-            var eventMerger = TableStorageEventMerger.From(eventTableFactory, allStreamTableFactory);
+            TableStorageEventMerger<PartitionedEventCloudTableFactory<EventCloudTableFactory>, AllStreamCloudTableFactory>? eventMerger = null;
+
+            if (startEventMerger)
+            {
+                eventMerger = TableStorageEventMerger.From(eventTableFactory, allStreamTableFactory);
+            }
 
             try
             {
@@ -403,7 +408,8 @@ namespace Corvus.EventStore.Example
 
                     const int batchSize = 625;
                     const int initializationBatchSize = 625;
-                    const int iterations = 100;
+                    const int iterations = 10;
+                    const int nodesPerAggregate = 8;
 
                     var aggregates = new ToDoList[aggregateIds.Length];
 
@@ -429,7 +435,8 @@ namespace Corvus.EventStore.Example
                     }
 
                     loadSw.Stop();
-                    Console.WriteLine($"Loaded in {loadSw.ElapsedMilliseconds / 1000.0} seconds");
+
+                    Console.WriteLine($"Loaded {aggregateIds.Length} in {loadSw.ElapsedMilliseconds / 1000.0} seconds ({aggregateIds.Length / (loadSw.ElapsedMilliseconds / 1000.0)} agg/sec)");
 
                     Console.WriteLine();
 
@@ -448,20 +455,24 @@ namespace Corvus.EventStore.Example
 
                             var sw = Stopwatch.StartNew();
 
-                            for (int taskCount = 0; taskCount < batchSize; ++taskCount)
+                            for (int node = 0; node < nodesPerAggregate; ++node)
                             {
-                                ToDoList toDoList = aggregates[(batch * batchSize) + taskCount];
-                                toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
-                                ////toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "Another day, another item", "This is the item in question");
-                                ValueTask<ToDoList> task = toDoList.CommitAsync(writer);
-                                taskList[taskCount] = task.AsTask();
+                                for (int taskCount = 0; taskCount < batchSize; ++taskCount)
+                                {
+                                    ToDoList toDoList = aggregates[(batch * batchSize) + taskCount];
+                                    toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
+                                    ////toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "Another day, another item", "This is the item in question");
+                                    ValueTask<ToDoList> task = toDoList.CommitAsync(writer);
+                                    taskList[taskCount] = task.AsTask();
+                                }
+
+                                ToDoList[] batchAggregates = await Task.WhenAll(taskList).ConfigureAwait(false);
+                                batchAggregates.CopyTo(aggregates, batch * batchSize);
                             }
 
-                            ToDoList[] batchAggregates = await Task.WhenAll(taskList).ConfigureAwait(false);
-                            batchAggregates.CopyTo(aggregates, batch * batchSize);
                             sw.Stop();
 
-                            Console.WriteLine(sw.ElapsedMilliseconds);
+                            Console.WriteLine($"{aggregateIds.Length * nodesPerAggregate} commits in {sw.ElapsedMilliseconds}, ({(aggregateIds.Length * nodesPerAggregate * batchSize) / (sw.ElapsedMilliseconds / 1000.0)} commits/s)");
                         }
 
                         double elapsed = (DateTimeOffset.Now - startTime).TotalMilliseconds;
@@ -469,25 +480,31 @@ namespace Corvus.EventStore.Example
                         // Rate limit to ~1 per second per node
                         if (elapsed < 900.0)
                         {
-                            await Task.Delay(900 - (int)elapsed).ConfigureAwait(false);
+                            int delay = 900 - (int)elapsed;
+                            Console.WriteLine($"Delaying {delay}ms");
+
+                            await Task.Delay(delay).ConfigureAwait(false);
                         }
                     }
 
                     executeSw.Stop();
-                    Console.WriteLine($"Executed {aggregateIds.Length * iterations} atomic commits in {executeSw.ElapsedMilliseconds / 1000.0} seconds");
+                    Console.WriteLine($"Executed {aggregateIds.Length * iterations * nodesPerAggregate} atomic commits in {executeSw.ElapsedMilliseconds / 1000.0} seconds ({aggregateIds.Length * iterations * nodesPerAggregate / (executeSw.ElapsedMilliseconds / 1000.0)} ) commits/sec");
                 }
 
                 Console.ReadKey();
             }
             finally
             {
-                try
+                if (eventMerger.HasValue)
                 {
-                    await eventMerger.DisposeAsync().ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex);
+                    try
+                    {
+                        await eventMerger.Value.DisposeAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex);
+                    }
                 }
             }
         }

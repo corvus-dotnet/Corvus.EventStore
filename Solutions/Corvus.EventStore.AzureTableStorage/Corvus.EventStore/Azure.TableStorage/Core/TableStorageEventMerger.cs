@@ -24,6 +24,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     {
         private const int MaxBatchSize = 99;
 
+        private static readonly TimeSpan DelayOnNoResults = TimeSpan.FromMilliseconds(250);
+
         private static readonly long MinAzureUtcDateTicks = new DateTimeOffset(1601, 1, 1, 0, 0, 0, TimeSpan.Zero).UtcTicks;
 
         private readonly ReliableTaskRunner mergeRunner;
@@ -124,6 +126,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                 var batch = new TableBatchOperation();
                                 int batchCount = 0;
                                 Task? batchTask = null;
+                                bool foundResults = false;
 
                                 do
                                 {
@@ -156,6 +159,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                         currentTokens[i] = segment.ContinuationToken;
                                         foreach (DynamicTableEntity result in segment.Results.OrderBy(r => r.Timestamp))
                                         {
+                                            foundResults = true;
                                             result.PartitionKey = pk;
                                             result.RowKey = allStreamIndex.ToString("D21");
                                             allStreamIndex += 1;
@@ -164,11 +168,13 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
                                             batch.Add(insertOperation);
                                             batchCount++;
+
+                                            // Add an extra item to the last batch to update the checkpoint.
+                                            checkpointsEntity.Properties[$"checkpointtimestamp{i}"] = new EntityProperty(checkpointTimestamps[i]);
+                                            checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
+
                                             if (batchCount == MaxBatchSize)
                                             {
-                                                // Add an extra item to the last batch to update the checkpoint.
-                                                checkpointsEntity.Properties[$"checkpointtimestamp{i}"] = new EntityProperty(checkpointTimestamps[i]);
-                                                checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
                                                 var writeOperation = TableOperation.InsertOrReplace(checkpointsEntity);
                                                 batch.Add(writeOperation);
                                                 if (batchTask != null)
@@ -211,6 +217,11 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                     var writeOperation = TableOperation.InsertOrReplace(checkpointsEntity);
                                     batch.Add(writeOperation);
                                     await outputTable.ExecuteBatchAsync(batch).ConfigureAwait(false);
+                                }
+
+                                if (!foundResults)
+                                {
+                                    await Task.Delay(DelayOnNoResults);
                                 }
                             }
                         }, token);
