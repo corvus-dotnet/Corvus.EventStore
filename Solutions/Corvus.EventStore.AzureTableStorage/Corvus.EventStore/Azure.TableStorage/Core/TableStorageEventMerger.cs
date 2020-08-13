@@ -200,7 +200,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                     await batchTask.ConfigureAwait(false);
                                 }
 
-                                if (batch.Count > 0)
+                                if (batchCount > 0)
                                 {
                                     for (int i = 0; i < checkpointTimestamps.Length; ++i)
                                     {
