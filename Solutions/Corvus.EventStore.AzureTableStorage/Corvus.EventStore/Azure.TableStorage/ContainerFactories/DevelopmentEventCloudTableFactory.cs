@@ -14,6 +14,8 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
     public readonly struct DevelopmentEventCloudTableFactory : IEventCloudTableFactory
     {
         private readonly CloudTableClient client;
+        private readonly CloudTable table;
+        private readonly ImmutableArray<CloudTable> tables;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DevelopmentEventCloudTableFactory"/> struct.
@@ -24,8 +26,9 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
             this.TableName = tableName;
             CloudStorageAccount account = CloudStorageAccount.DevelopmentStorageAccount;
             this.client = account.CreateCloudTableClient(new TableClientConfiguration());
-            CloudTable table = this.GetTableReference();
-            table.CreateIfNotExists();
+            this.table = GetTableReference(this.client, tableName);
+            this.table.CreateIfNotExists();
+            this.tables = ImmutableArray.Create(this.table);
         }
 
         /// <summary>
@@ -36,18 +39,18 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
         /// <inheritdoc/>
         public CloudTable GetTable(Guid aggregateId, string partitionKey)
         {
-            return this.GetTableReference();
+            return this.table;
         }
 
         /// <inheritdoc/>
         public ImmutableArray<CloudTable> GetTables()
         {
-            return ImmutableArray.Create(this.GetTableReference());
+            return this.tables;
         }
 
-        private CloudTable GetTableReference()
+        private static CloudTable GetTableReference(CloudTableClient client, string tableName)
         {
-            return this.client.GetTableReference(this.TableName ?? "corvusevents");
+            return client.GetTableReference(tableName ?? "corvusevents");
         }
     }
 }

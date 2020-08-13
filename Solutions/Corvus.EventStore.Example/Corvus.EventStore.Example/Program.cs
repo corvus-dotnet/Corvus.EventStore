@@ -45,17 +45,17 @@ namespace Corvus.EventStore.Example
             ////Console.WriteLine("Running with table storage.");
             ////await RunWithTableStorageAsync().ConfigureAwait(false);
 
-            ////Console.WriteLine("Running with multi-partition table storage");
-            ////await RunWithMultiPartitionTableStorageAsync(true).ConfigureAwait(false);
+            Console.WriteLine("Running with multi-partition table storage");
+            await RunWithMultiPartitionTableStorageAsync(false).ConfigureAwait(false);
 
-            Console.WriteLine("Running with multi-partition table storage in Azure");
+            ////Console.WriteLine("Running with multi-partition table storage in Azure");
 
-            IConfigurationBuilder builder = new ConfigurationBuilder()
-                .AddJsonFile($"local.settings.json", true, true);
+            ////IConfigurationBuilder builder = new ConfigurationBuilder()
+            ////    .AddJsonFile($"local.settings.json", true, true);
 
-            IConfigurationRoot config = builder.Build();
+            ////IConfigurationRoot config = builder.Build();
 
-            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), true).ConfigureAwait(false);
+            ////await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), true).ConfigureAwait(false);
 
             Console.ReadKey();
         }
@@ -298,12 +298,15 @@ namespace Corvus.EventStore.Example
                         .Select(i => Guid.NewGuid())
                         .ToArray();
 
-                    const int batchSize = 100;
+                    const int batchSize = 10;
                     const int initializationBatchSize = 10;
+                    const int iterations = 2;
 
                     var aggregates = new ToDoList[aggregateIds.Length];
 
                     Console.Write("Initializing aggregates");
+
+                    var loadSw = Stopwatch.StartNew();
 
                     for (int i = 0; i < (int)Math.Ceiling((double)aggregateIds.Length / initializationBatchSize); ++i)
                     {
@@ -313,14 +316,19 @@ namespace Corvus.EventStore.Example
                         Console.Write(".");
                     }
 
+                    loadSw.Stop();
+                    Console.WriteLine($"Loaded in {loadSw.ElapsedMilliseconds / 1000.0} seconds");
+
                     Console.WriteLine();
 
-                    for (int i = 0; i < 2; ++i)
+                    var executeSw = Stopwatch.StartNew();
+
+                    for (int i = 0; i < iterations; ++i)
                     {
                         Console.WriteLine($"Iteration {i}");
-                        var sw = Stopwatch.StartNew();
                         for (int batch = 0; batch < aggregateIds.Length / batchSize; ++batch)
                         {
+                            var sw = Stopwatch.StartNew();
                             Console.WriteLine($"Batch {batch}");
 
                             var taskList = new List<Task<ToDoList>>();
@@ -340,6 +348,9 @@ namespace Corvus.EventStore.Example
                             Console.WriteLine(sw.ElapsedMilliseconds);
                         }
                     }
+
+                    executeSw.Stop();
+                    Console.WriteLine($"Executed {aggregateIds.Length * iterations} atomic commits in {executeSw.ElapsedMilliseconds / 1000.0} seconds");
                 }
 
                 Console.ReadKey();
@@ -383,28 +394,47 @@ namespace Corvus.EventStore.Example
                         TableStorageAggregateWriter.GetInstance(eventTableFactory, snapshotTableFactory);
 
                     // This is the ID of our aggregate - imagine this came in from the request, for example.
-                    Guid[] aggregateIds = Enumerable.Range(0, 1000)
+                    Guid[] aggregateIds = Enumerable.Range(0, 1000000)
                         .Select(i => Guid.NewGuid())
                         .ToArray();
 
-                    const int batchSize = 20;
-                    const int initializationBatchSize = 10;
+                    const int batchSize = 1000;
+                    const int initializationBatchSize = 1000;
+                    const int iterations = 2;
 
                     var aggregates = new ToDoList[aggregateIds.Length];
 
                     Console.Write("Initializing aggregates");
 
+                    var initTaskList = new Task<ToDoList>[initializationBatchSize];
+
+                    var loadSw = Stopwatch.StartNew();
                     for (int i = 0; i < (int)Math.Ceiling((double)aggregateIds.Length / initializationBatchSize); ++i)
                     {
-                        IEnumerable<int> range = Enumerable.Range(initializationBatchSize * i, Math.Min(initializationBatchSize, aggregates.Length - (initializationBatchSize * i)));
-                        ToDoList[] results = await Task.WhenAll(range.Select(index => ToDoList.ReadAsync(reader, aggregateIds[index], aggregateIds[index].ToString()).AsTask()).ToList()).ConfigureAwait(false);
-                        results.CopyTo(aggregates, range.First());
+                        ////IEnumerable<int> range = Enumerable.Range(initializationBatchSize * i, Math.Min(initializationBatchSize, aggregates.Length - (initializationBatchSize * i)));
+                        ////ToDoList[] results = await Task.WhenAll(range.Select(index => ToDoList.ReadAsync(reader, aggregateIds[index], aggregateIds[index].ToString()).AsTask()).ToList()).ConfigureAwait(false);
+
+                        for (int index = 0; index < initializationBatchSize; ++index)
+                        {
+                            Guid id = aggregateIds[(initializationBatchSize * i) + index];
+                            initTaskList[index] = ToDoList.ReadAsync(reader, id, id.ToString()).AsTask();
+                        }
+
+                        ToDoList[] results = await Task.WhenAll(initTaskList).ConfigureAwait(false);
+                        results.CopyTo(aggregates, initializationBatchSize * i);
                         Console.Write(".");
                     }
 
+                    loadSw.Stop();
+                    Console.WriteLine($"Loaded in {loadSw.ElapsedMilliseconds / 1000.0} seconds");
+
                     Console.WriteLine();
 
-                    for (int i = 0; i < 2; ++i)
+                    var executeSw = Stopwatch.StartNew();
+
+                    var taskList = new Task<ToDoList>[batchSize];
+
+                    for (int i = 0; i < iterations; ++i)
                     {
                         Console.WriteLine($"Iteration {i}");
                         for (int batch = 0; batch < aggregateIds.Length / batchSize; ++batch)
@@ -412,7 +442,6 @@ namespace Corvus.EventStore.Example
                             Console.WriteLine($"Batch {batch}");
 
                             var sw = Stopwatch.StartNew();
-                            var taskList = new List<Task<ToDoList>>();
 
                             for (int taskCount = 0; taskCount < batchSize; ++taskCount)
                             {
@@ -420,7 +449,7 @@ namespace Corvus.EventStore.Example
                                 toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
                                 toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "Another day, another item", "This is the item in question");
                                 ValueTask<ToDoList> task = toDoList.CommitAsync(writer);
-                                taskList.Add(task.AsTask());
+                                taskList[taskCount] = task.AsTask();
                             }
 
                             ToDoList[] batchAggregates = await Task.WhenAll(taskList).ConfigureAwait(false);
@@ -429,6 +458,9 @@ namespace Corvus.EventStore.Example
                             Console.WriteLine(sw.ElapsedMilliseconds);
                         }
                     }
+
+                    executeSw.Stop();
+                    Console.WriteLine($"Executed {aggregateIds.Length * iterations} atomic commits in {executeSw.ElapsedMilliseconds / 1000.0} seconds");
                 }
 
                 Console.ReadKey();

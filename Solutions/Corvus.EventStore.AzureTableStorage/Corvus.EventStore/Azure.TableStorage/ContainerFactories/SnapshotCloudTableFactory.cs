@@ -6,7 +6,6 @@ namespace Corvus.SnapshotStore.Azure.TableStorage.ContainerFactories
 {
     using System;
     using System.Collections.Immutable;
-    using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
     using Microsoft.Azure.Cosmos.Table;
 
@@ -16,9 +15,11 @@ namespace Corvus.SnapshotStore.Azure.TableStorage.ContainerFactories
     public readonly struct SnapshotCloudTableFactory : ISnapshotCloudTableFactory
     {
         private readonly CloudTableClient client;
+        private readonly CloudTable table;
+        private readonly ImmutableArray<CloudTable> tables;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="EventCloudTableFactory"/> struct.
+        /// Initializes a new instance of the <see cref="SnapshotCloudTableFactory"/> struct.
         /// </summary>
         /// <param name="connectionString">The connection string to use.</param>
         /// <param name="tableName">The table name to use.</param>
@@ -27,8 +28,9 @@ namespace Corvus.SnapshotStore.Azure.TableStorage.ContainerFactories
             this.TableName = tableName;
             var account = CloudStorageAccount.Parse(connectionString);
             this.client = account.CreateCloudTableClient(new TableClientConfiguration());
-            CloudTable table = this.GetTableReference();
-            table.CreateIfNotExists();
+            this.table = GetTableReference(this.client, this.TableName);
+            this.table.CreateIfNotExists();
+            this.tables = ImmutableArray.Create(this.table);
         }
 
         /// <summary>
@@ -39,18 +41,18 @@ namespace Corvus.SnapshotStore.Azure.TableStorage.ContainerFactories
         /// <inheritdoc/>
         public CloudTable GetTable(Guid aggregateId, string partitionKey)
         {
-            return this.GetTableReference();
+            return this.table;
         }
 
         /// <inheritdoc/>
         public ImmutableArray<CloudTable> GetTables()
         {
-            return ImmutableArray.Create(this.GetTableReference());
+            return this.tables;
         }
 
-        private CloudTable GetTableReference()
+        private static CloudTable GetTableReference(CloudTableClient client, string tableName)
         {
-            return this.client.GetTableReference(this.TableName ?? "corvussnapshots");
+            return client.GetTableReference(tableName ?? "corvussnapshots");
         }
     }
 }

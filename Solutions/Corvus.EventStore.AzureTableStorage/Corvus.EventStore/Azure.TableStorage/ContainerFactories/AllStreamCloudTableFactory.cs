@@ -4,8 +4,6 @@
 
 namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
 {
-    using System;
-    using System.Collections.Immutable;
     using Microsoft.Azure.Cosmos.Table;
 
     /// <summary>
@@ -14,6 +12,7 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
     public readonly struct AllStreamCloudTableFactory : IAllStreamCloudTableFactory
     {
         private readonly CloudTableClient client;
+        private readonly CloudTable table;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AllStreamCloudTableFactory"/> struct.
@@ -25,8 +24,8 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
             this.TableName = tableName;
             var account = CloudStorageAccount.Parse(connectionString);
             this.client = account.CreateCloudTableClient(new TableClientConfiguration());
-            CloudTable table = this.GetTableReference();
-            table.CreateIfNotExists();
+            this.table = GetTableReference(this.client, this.TableName);
+            this.table.CreateIfNotExists();
         }
 
         /// <summary>
@@ -37,12 +36,12 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
         /// <inheritdoc/>
         public CloudTable GetTable()
         {
-            return this.GetTableReference();
+            return this.table;
         }
 
-        private CloudTable GetTableReference()
+        private static CloudTable GetTableReference(CloudTableClient client, string tableName)
         {
-            return this.client.GetTableReference(this.TableName ?? "corvusallstream");
+            return client.GetTableReference(tableName ?? "corvusevents");
         }
     }
 }
