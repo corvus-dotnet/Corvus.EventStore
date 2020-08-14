@@ -376,6 +376,14 @@ namespace Corvus.EventStore.Example
             var snapshotTableFactory = new SnapshotCloudTableFactory(connectionString, "mwacorvussnapshots");
             var allStreamTableFactory = new AllStreamCloudTableFactory(connectionString, "mwacorvusallstream");
 
+            // Now were done, start the merger, just to see whether that works.
+            TableStorageEventMerger<PartitionedEventCloudTableFactory<EventCloudTableFactory>, AllStreamCloudTableFactory>? eventMerger = null;
+
+            if (startEventMerger)
+            {
+                eventMerger = TableStorageEventMerger.From(eventTableFactory, allStreamTableFactory);
+            }
+
             try
             {
                 if (writeMore)
@@ -403,6 +411,7 @@ namespace Corvus.EventStore.Example
                     const int initializationBatchSize = 625;
                     const int iterations = 10;
                     const int nodesPerAggregate = 8;
+                    const int maxRatePerNode = 2000;
 
                     var aggregates = new ToDoList[aggregateIds.Length];
 
@@ -470,9 +479,9 @@ namespace Corvus.EventStore.Example
                         double elapsed = (DateTimeOffset.Now - startTime).TotalMilliseconds;
 
                         // Rate limit to ~1 per second per node
-                        if (elapsed < 900.0)
+                        if (elapsed < maxRatePerNode)
                         {
-                            int delay = 900 - (int)elapsed;
+                            int delay = maxRatePerNode - (int)elapsed;
                             Console.WriteLine($"Delaying {delay}ms");
 
                             await Task.Delay(delay).ConfigureAwait(false);
@@ -485,14 +494,6 @@ namespace Corvus.EventStore.Example
             }
             finally
             {
-                // Now were done, start the merger, just to see whether that works.
-                TableStorageEventMerger<PartitionedEventCloudTableFactory<EventCloudTableFactory>, AllStreamCloudTableFactory>? eventMerger = null;
-
-                if (startEventMerger)
-                {
-                    eventMerger = TableStorageEventMerger.From(eventTableFactory, allStreamTableFactory);
-                }
-
                 Console.ReadKey();
 
                 if (eventMerger.HasValue)

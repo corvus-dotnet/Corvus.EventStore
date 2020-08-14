@@ -5,9 +5,11 @@
 namespace Corvus.EventStore.Azure.TableStorage.Core
 {
     using System;
+    using System.Collections.Generic;
     using System.Collections.Immutable;
     using System.Diagnostics;
     using System.Linq;
+    using System.Runtime.CompilerServices;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
     using Corvus.EventStore.Core;
@@ -28,7 +30,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
         // This is the maximum amount of time we may have to look back on any instance
         // for items with aged timestamps due to retrying commits.
-        private static readonly long MaxTimeoutDelay = TimeSpan.FromSeconds(3).Ticks;
+        private static readonly long MaxTimeoutDelay = TimeSpan.FromMilliseconds(10000).Ticks;
 
         // Ensure we flush at least once a second
         private static readonly TimeSpan FlushTimeout = TimeSpan.FromMilliseconds(1000);
@@ -104,7 +106,35 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
                                 allStreamIndex = checkpointsEntity.Properties["allStreamIndex"].Int64Value!.Value;
 
-                                //// So we need to seed our "we've already seen these" list with the items for each source
+                                string filter = string.Empty;
+
+                                for (int sourceIndex = 0; sourceIndex < checkpointTimestamps.Length; ++sourceIndex)
+                                {
+                                    string newFilter =
+                                    TableQuery.CombineFilters(
+                                        TableQuery.GenerateFilterConditionForDate("CommitOriginalTimestamp", QueryComparisons.GreaterThan, new DateTimeOffset(checkpointTimestamps[sourceIndex] - MaxTimeoutDelay, TimeSpan.Zero)),
+                                        TableOperators.And,
+                                        TableQuery.GenerateFilterConditionForInt("CommitOriginalSource", QueryComparisons.Equal, sourceIndex));
+                                    if (filter.Length == 0)
+                                    {
+                                        filter = newFilter;
+                                    }
+                                    else
+                                    {
+                                        filter = TableQuery.CombineFilters(filter, TableOperators.Or, newFilter);
+                                    }
+                                }
+
+                                TableQuery<DynamicTableEntity> query = new TableQuery<DynamicTableEntity>().Where(filter);
+                                IEnumerable<DynamicTableEntity> results = outputTable.ExecuteQuery(query);
+                                ImmutableHashSet<(Guid, long)>.Builder builder = ImmutableHashSet.CreateBuilder<(Guid, long)>();
+
+                                foreach (DynamicTableEntity? result in results)
+                                {
+                                    builder.Add((result.Properties["Commit" + nameof(Commit.AggregateId)].GuidValue!.Value, result.Properties["Commit" + nameof(Commit.SequenceNumber)].Int64Value!.Value));
+                                }
+
+                                lastFoundItems = builder.ToImmutable();
                             }
                             else
                             {
@@ -124,6 +154,9 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                             var tasks = new Task<TableQuerySegment<DynamicTableEntity>?>[inputTables.Length];
 
                             DateTimeOffset lastFlush = DateTimeOffset.Now;
+                            int batchCount = 0;
+                            var batch = new TableBatchOperation();
+                            Task? batchTask = null;
 
                             while (true)
                             {
@@ -142,9 +175,6 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                                  .OrderBy("Timestamp");
                                     }
 
-                                    var batch = new TableBatchOperation();
-                                    int batchCount = 0;
-                                    Task? batchTask = null;
                                     bool foundResults = false;
 
                                     do
@@ -229,6 +259,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                     {
                                         // Wait for the previous insert to complete.
                                         await batchTask.ConfigureAwait(false);
+                                        batchTask = null;
                                     }
 
                                     if (DateTimeOffset.Now - lastFlush > FlushTimeout)
@@ -237,12 +268,14 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                         var writeOperation = TableOperation.InsertOrReplace(checkpointsEntity);
                                         batch.Add(writeOperation);
                                         await outputTable.ExecuteBatchAsync(batch).ConfigureAwait(false);
+                                        batch = new TableBatchOperation();
+                                        batchCount = 0;
                                         lastFlush = DateTimeOffset.Now;
                                     }
 
                                     if (!foundResults)
                                     {
-                                        await Task.Delay(DelayOnNoResults);
+                                        await Task.Delay(DelayOnNoResults).ConfigureAwait(false);
                                     }
                                 }
                                 catch (Exception ex)

@@ -4,6 +4,7 @@
 
 namespace Corvus.EventStore.Azure.TableStorage.Core
 {
+    using System;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
     using Corvus.EventStore.Azure.TableStorage.Core.Internal;
@@ -15,6 +16,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     /// </summary>
     public readonly struct TableStorageEventWriter : IEventWriter
     {
+        private static readonly TableRequestOptions Options = new TableRequestOptions { MaximumExecutionTime = TimeSpan.FromMilliseconds(1500) };
+
         private readonly IEventCloudTableFactory cloudTableFactory;
 
         /// <summary>
@@ -41,7 +44,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             var insertOperation = TableOperation.Insert(commitEntity);
             try
             {
-                _ = await table.ExecuteAsync(insertOperation).ConfigureAwait(false);
+                _ = await table.ExecuteAsync(insertOperation, Options, null).ConfigureAwait(false);
             }
             catch (StorageException ex)
             {
