@@ -16,7 +16,13 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     /// </summary>
     public readonly struct TableStorageEventWriter : IEventWriter
     {
-        private static readonly TableRequestOptions Options = new TableRequestOptions { MaximumExecutionTime = TimeSpan.FromMilliseconds(1500) };
+        private static readonly TableRequestOptions Options =
+            new TableRequestOptions
+            {
+                MaximumExecutionTime = TimeSpan.FromMilliseconds(1500),
+                ServerTimeout = TimeSpan.FromMilliseconds(500),
+                RetryPolicy = new NoRetry(),
+            };
 
         private readonly IEventCloudTableFactory cloudTableFactory;
 

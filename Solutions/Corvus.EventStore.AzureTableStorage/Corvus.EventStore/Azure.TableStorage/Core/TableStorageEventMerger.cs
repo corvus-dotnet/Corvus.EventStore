@@ -156,7 +156,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                             DateTimeOffset lastFlush = DateTimeOffset.Now;
                             int batchCount = 0;
                             var batch = new TableBatchOperation();
-                            Task? batchTask = null;
+                            Task<TableBatchResult>? batchTask = null;
 
                             while (true)
                             {
@@ -233,7 +233,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                                         if (batchTask != null)
                                                         {
                                                             // Wait for the previous insert to complete.
-                                                            await batchTask.ConfigureAwait(false);
+                                                            await HandleBatchResult(batchTask).ConfigureAwait(false);
                                                         }
 
                                                         // Stash it away and carry on.
@@ -258,7 +258,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                     if (batchTask != null)
                                     {
                                         // Wait for the previous insert to complete.
-                                        await batchTask.ConfigureAwait(false);
+                                        await HandleBatchResult(batchTask).ConfigureAwait(false);
                                         batchTask = null;
                                     }
 
@@ -288,6 +288,18 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                         }, token);
                 },
                 new Retry.Policies.AnyExceptionPolicy());
+        }
+
+        private static async Task HandleBatchResult(Task<TableBatchResult> batchTask)
+        {
+            TableBatchResult batchResults = await batchTask.ConfigureAwait(false);
+            foreach (TableResult batchResult in batchResults)
+            {
+                if (batchResult.HttpStatusCode < 200 || batchResult.HttpStatusCode > 299)
+                {
+                    throw new Exception($"Batch failed with HttpStatusCode {batchResult.HttpStatusCode}.");
+                }
+            }
         }
 
         private static void UpdateCheckpointsEntity(DynamicTableEntity checkpointsEntity, long[] checkpointTimestamps, long allStreamIndex)
