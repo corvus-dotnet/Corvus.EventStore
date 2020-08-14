@@ -367,14 +367,14 @@ namespace Corvus.EventStore.Example
             // This would typically be done while you are setting up the container
             // Here, we are setting up two separate physical partitions for the storage
             // (in a real implementation this would typically be in two entirely different storage accounts to improve throughput)
-            var eventTableFactoryP1 = new EventCloudTableFactory(connectionString, "corvusevents1");
-            var eventTableFactoryP2 = new EventCloudTableFactory(connectionString, "corvusevents2");
-            var eventTableFactoryP3 = new EventCloudTableFactory(connectionString, "corvusevents3");
-            var eventTableFactoryP4 = new EventCloudTableFactory(connectionString, "corvusevents4");
-            var eventTableFactoryP5 = new EventCloudTableFactory(connectionString, "corvusevents4");
+            var eventTableFactoryP1 = new EventCloudTableFactory(connectionString, "mwacorvusevents1");
+            var eventTableFactoryP2 = new EventCloudTableFactory(connectionString, "mwacorvusevents2");
+            var eventTableFactoryP3 = new EventCloudTableFactory(connectionString, "mwacorvusevents3");
+            var eventTableFactoryP4 = new EventCloudTableFactory(connectionString, "mwacorvusevents4");
+            var eventTableFactoryP5 = new EventCloudTableFactory(connectionString, "mwacorvusevents5");
             var eventTableFactory = new PartitionedEventCloudTableFactory<EventCloudTableFactory>(eventTableFactoryP1, eventTableFactoryP2, eventTableFactoryP3, eventTableFactoryP4, eventTableFactoryP5);
-            var snapshotTableFactory = new SnapshotCloudTableFactory(connectionString, "corvussnapshots");
-            var allStreamTableFactory = new AllStreamCloudTableFactory(connectionString, "corvusallstream");
+            var snapshotTableFactory = new SnapshotCloudTableFactory(connectionString, "mwacorvussnapshots");
+            var allStreamTableFactory = new AllStreamCloudTableFactory(connectionString, "mwacorvusallstream");
 
             TableStorageEventMerger<PartitionedEventCloudTableFactory<EventCloudTableFactory>, AllStreamCloudTableFactory>? eventMerger = null;
 
@@ -461,7 +461,6 @@ namespace Corvus.EventStore.Example
                                 {
                                     ToDoList toDoList = aggregates[(batch * batchSize) + taskCount];
                                     toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
-                                    ////toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "Another day, another item", "This is the item in question");
                                     ValueTask<ToDoList> task = toDoList.CommitAsync(writer);
                                     taskList[taskCount] = task.AsTask();
                                 }
@@ -472,7 +471,7 @@ namespace Corvus.EventStore.Example
 
                             sw.Stop();
 
-                            Console.WriteLine($"{aggregateIds.Length * nodesPerAggregate} commits in {sw.ElapsedMilliseconds}, ({(aggregateIds.Length * nodesPerAggregate * batchSize) / (sw.ElapsedMilliseconds / 1000.0)} commits/s)");
+                            Console.WriteLine($"{aggregateIds.Length * nodesPerAggregate} commits in {sw.ElapsedMilliseconds}, ({(aggregateIds.Length * nodesPerAggregate) / (sw.ElapsedMilliseconds / 1000.0)} commits/s)");
                         }
 
                         double elapsed = (DateTimeOffset.Now - startTime).TotalMilliseconds;
