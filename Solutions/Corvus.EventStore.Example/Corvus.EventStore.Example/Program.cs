@@ -376,13 +376,6 @@ namespace Corvus.EventStore.Example
             var snapshotTableFactory = new SnapshotCloudTableFactory(connectionString, "mwacorvussnapshots");
             var allStreamTableFactory = new AllStreamCloudTableFactory(connectionString, "mwacorvusallstream");
 
-            TableStorageEventMerger<PartitionedEventCloudTableFactory<EventCloudTableFactory>, AllStreamCloudTableFactory>? eventMerger = null;
-
-            if (startEventMerger)
-            {
-                eventMerger = TableStorageEventMerger.From(eventTableFactory, allStreamTableFactory);
-            }
-
             try
             {
                 if (writeMore)
@@ -489,11 +482,19 @@ namespace Corvus.EventStore.Example
                     executeSw.Stop();
                     Console.WriteLine($"Executed {aggregateIds.Length * iterations * nodesPerAggregate} atomic commits in {executeSw.ElapsedMilliseconds / 1000.0} seconds ({aggregateIds.Length * iterations * nodesPerAggregate / (executeSw.ElapsedMilliseconds / 1000.0)} ) commits/sec");
                 }
-
-                Console.ReadKey();
             }
             finally
             {
+                // Now were done, start the merger, just to see whether that works.
+                TableStorageEventMerger<PartitionedEventCloudTableFactory<EventCloudTableFactory>, AllStreamCloudTableFactory>? eventMerger = null;
+
+                if (startEventMerger)
+                {
+                    eventMerger = TableStorageEventMerger.From(eventTableFactory, allStreamTableFactory);
+                }
+
+                Console.ReadKey();
+
                 if (eventMerger.HasValue)
                 {
                     try

@@ -10,6 +10,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     using System.Linq;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
+    using Corvus.EventStore.Core;
     using Corvus.Extensions;
     using Corvus.Retry;
     using Microsoft.Azure.Cosmos.Table;
@@ -24,6 +25,13 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         where TOutputCloudTableFactory : IAllStreamCloudTableFactory
     {
         private const int MaxBatchSize = 99;
+
+        // This is the maximum amount of time we may have to look back on any instance
+        // for items with aged timestamps due to retrying commits.
+        private static readonly long MaxTimeoutDelay = TimeSpan.FromSeconds(3).Ticks;
+
+        // Ensure we flush at least once a second
+        private static readonly TimeSpan FlushTimeout = TimeSpan.FromMilliseconds(1000);
 
         private static readonly TimeSpan DelayOnNoResults = TimeSpan.FromMilliseconds(250);
 
@@ -81,9 +89,11 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                             TableResult tableResult = await outputTable.ExecuteAsync(operation).ConfigureAwait(false);
                             DynamicTableEntity checkpointsEntity = (DynamicTableEntity)tableResult.Result ?? new DynamicTableEntity(pk, rk);
 
-                            long[] checkpointTimestamps = Enumerable.Repeat(MinAzureUtcDateTicks, inputTables.Length).ToArray();
+                            long[] checkpointTimestamps = Enumerable.Repeat(MinAzureUtcDateTicks + MaxTimeoutDelay, inputTables.Length).ToArray();
 
                             long allStreamIndex = 0;
+
+                            ImmutableHashSet<(Guid, long)> lastFoundItems = ImmutableHashSet<(Guid, long)>.Empty;
 
                             if (tableResult.HttpStatusCode == 200)
                             {
@@ -93,6 +103,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                 }
 
                                 allStreamIndex = checkpointsEntity.Properties["allStreamIndex"].Int64Value!.Value;
+
+                                //// So we need to seed our "we've already seen these" list with the items for each source
                             }
                             else
                             {
@@ -110,11 +122,12 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                             var queries = new TableQuery<DynamicTableEntity>[inputTables.Length];
                             var currentTokens = new TableContinuationToken?[inputTables.Length];
                             var tasks = new Task<TableQuerySegment<DynamicTableEntity>?>[inputTables.Length];
-                            //// Uncomment if you want to monitor what is being added.
-                            ////ImmutableHashSet<(Guid, long)> foundItems = ImmutableHashSet<(Guid, long)>.Empty;
+
+                            DateTimeOffset lastFlush = DateTimeOffset.Now;
 
                             while (true)
                             {
+                                ImmutableHashSet<(Guid, long)>.Builder currentFoundItems = ImmutableHashSet.CreateBuilder<(Guid, long)>();
                                 try
                                 {
                                     bool firstTime = true;
@@ -125,7 +138,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                         queries[i] =
                                             new TableQuery<DynamicTableEntity>()
                                                  .Where(
-                                                    TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThan, new DateTimeOffset(checkpointTimestamps[i], TimeSpan.Zero)))
+                                                    TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThan, new DateTimeOffset(checkpointTimestamps[i] - MaxTimeoutDelay, TimeSpan.Zero)))
                                                  .OrderBy("Timestamp");
                                     }
 
@@ -165,41 +178,40 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                             currentTokens[i] = segment.ContinuationToken;
                                             foreach (DynamicTableEntity result in segment.Results.OrderBy(r => r.Timestamp))
                                             {
-                                                //// Uncomment if you want to monitor what is being added.
-                                                ////(Guid, long) foundItem = (result.Properties["Commit" + nameof(Commit.AggregateId)].GuidValue!.Value, result.Properties["Commit" + nameof(Commit.SequenceNumber)].Int64Value!.Value);
-                                                ////if (foundItems.Contains(foundItem))
-                                                ////{
-                                                ////    Console.WriteLine($"Already seen item {foundItem} in the event feed.");
-                                                ////}
-                                                ////else
-                                                ////{
-                                                ////    foundItems = foundItems.Add(foundItem);
-                                                ////}
+                                                (Guid, long) foundItem = (result.Properties["Commit" + nameof(Commit.AggregateId)].GuidValue!.Value, result.Properties["Commit" + nameof(Commit.SequenceNumber)].Int64Value!.Value);
+                                                currentFoundItems.Add(foundItem);
 
-                                                var dte = new DynamicTableEntity(pk, allStreamIndex.ToString("D21"));
-                                                dte.Properties.AddRange(result.Properties);
-                                                foundResults = true;
-                                                allStreamIndex += 1;
-                                                checkpointTimestamps[i] = result.Timestamp.UtcTicks;
-                                                var insertOperation = TableOperation.Insert(dte);
-                                                batch.Add(insertOperation);
-                                                batchCount++;
-
-                                                if (batchCount == MaxBatchSize)
+                                                if (!lastFoundItems.Contains(foundItem))
                                                 {
-                                                    UpdateCheckpointsEntity(checkpointsEntity, checkpointTimestamps, allStreamIndex);
-                                                    var writeOperation = TableOperation.InsertOrReplace(checkpointsEntity);
-                                                    batch.Add(writeOperation);
-                                                    if (batchTask != null)
-                                                    {
-                                                        // Wait for the previous insert to complete.
-                                                        await batchTask.ConfigureAwait(false);
-                                                    }
+                                                    var dte = new DynamicTableEntity(pk, allStreamIndex.ToString("D21"));
+                                                    dte.Properties.AddRange(result.Properties);
+                                                    dte.Properties.Add("CommitOriginalTimestamp", new EntityProperty(result.Timestamp));
+                                                    dte.Properties.Add("CommitSource", new EntityProperty(i));
+                                                    foundResults = true;
+                                                    allStreamIndex += 1;
+                                                    checkpointTimestamps[i] = Math.Max(checkpointTimestamps[i], result.Timestamp.UtcTicks);
+                                                    var insertOperation = TableOperation.Insert(dte);
+                                                    batch.Add(insertOperation);
+                                                    batchCount++;
 
-                                                    // Stash it away and carry on.
-                                                    batchTask = outputTable.ExecuteBatchAsync(batch);
-                                                    batch = new TableBatchOperation();
-                                                    batchCount = 0;
+                                                    if (batchCount == MaxBatchSize)
+                                                    {
+                                                        // Only update the all stream index while we are mid-query segment
+                                                        checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
+                                                        var checkpointOperation = TableOperation.InsertOrReplace(checkpointsEntity);
+                                                        batch.Add(checkpointOperation);
+                                                        if (batchTask != null)
+                                                        {
+                                                            // Wait for the previous insert to complete.
+                                                            await batchTask.ConfigureAwait(false);
+                                                        }
+
+                                                        // Stash it away and carry on.
+                                                        batchTask = outputTable.ExecuteBatchAsync(batch);
+                                                        batch = new TableBatchOperation();
+                                                        batchCount = 0;
+                                                        lastFlush = DateTimeOffset.Now;
+                                                    }
                                                 }
                                             }
                                         }
@@ -219,12 +231,13 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                         await batchTask.ConfigureAwait(false);
                                     }
 
-                                    if (batchCount > 0)
+                                    if (DateTimeOffset.Now - lastFlush > FlushTimeout)
                                     {
                                         UpdateCheckpointsEntity(checkpointsEntity, checkpointTimestamps, allStreamIndex);
                                         var writeOperation = TableOperation.InsertOrReplace(checkpointsEntity);
                                         batch.Add(writeOperation);
                                         await outputTable.ExecuteBatchAsync(batch).ConfigureAwait(false);
+                                        lastFlush = DateTimeOffset.Now;
                                     }
 
                                     if (!foundResults)
@@ -236,6 +249,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                 {
                                     Console.WriteLine(ex);
                                 }
+
+                                lastFoundItems = currentFoundItems.ToImmutable();
                             }
                         }, token);
                 },
