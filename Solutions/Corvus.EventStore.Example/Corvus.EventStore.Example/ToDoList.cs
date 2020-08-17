@@ -95,11 +95,8 @@ namespace Corvus.EventStore.Example
             // Then apply an event to set the owner
             return new ToDoList(
                 this.aggregate.ApplyEvent(
-                    new Event<ToDoListOwnerSetEventPayload>(
                         ToDoListOwnerSetEventPayload.EventType,
-                        this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.Now.UtcTicks,
-                        new ToDoListOwnerSetEventPayload(owner))));
+                        new ToDoListOwnerSetEventPayload(owner)));
         }
 
         /// <summary>
@@ -113,11 +110,8 @@ namespace Corvus.EventStore.Example
             // Then apply an event to set the owner
             return new ToDoList(
                 this.aggregate.ApplyEvent(
-                    new Event<ToDoListStartDateSetEventPayload>(
                         ToDoListStartDateSetEventPayload.EventType,
-                        this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.Now.UtcTicks,
-                        new ToDoListStartDateSetEventPayload(startDate))));
+                        new ToDoListStartDateSetEventPayload(startDate)));
         }
 
         /// <summary>
@@ -138,11 +132,8 @@ namespace Corvus.EventStore.Example
             // Then apply an event to set the owner
             return new ToDoList(
                 this.aggregate.ApplyEvent(
-                    new Event<ToDoItemAddedEventPayload>(
                         ToDoItemAddedEventPayload.EventType,
-                        this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.Now.UtcTicks,
-                        new ToDoItemAddedEventPayload(id, title, description))));
+                        new ToDoItemAddedEventPayload(id, title, description)));
         }
 
         /// <summary>
@@ -161,11 +152,8 @@ namespace Corvus.EventStore.Example
             // Then apply an event to set the owner
             return new ToDoList(
                 this.aggregate.ApplyEvent(
-                    new Event<ToDoItemRemovedEventPayload>(
                         ToDoItemRemovedEventPayload.EventType,
-                        this.aggregate.EventSequenceNumber + 1,
-                        DateTimeOffset.Now.UtcTicks,
-                        new ToDoItemRemovedEventPayload(id))));
+                        new ToDoItemRemovedEventPayload(id)));
         }
 
         /// <summary>
@@ -181,8 +169,7 @@ namespace Corvus.EventStore.Example
             return new ToDoList(
                 await writer.CommitAsync(
                     this.aggregate,
-                    DateTimeOffset.Now.UtcTicks,
-                    NeverSnapshotPolicy<AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>>.Instance).ConfigureAwait(false));
+                    snapshotPolicy: NeverSnapshotPolicy<AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>>.Instance).ConfigureAwait(false));
         }
     }
 }

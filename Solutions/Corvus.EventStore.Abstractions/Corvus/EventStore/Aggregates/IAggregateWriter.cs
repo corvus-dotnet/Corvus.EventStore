@@ -18,10 +18,10 @@ namespace Corvus.EventStore.Aggregates
         /// <typeparam name="TAggregate">The type of aggregate being stored.</typeparam>
         /// <typeparam name="TSnapshotPolicy">The type of snapshot policy.</typeparam>
         /// <param name="aggregate">The aggregate to store.</param>
-        /// <param name="timestamp">The nominal current wall clock timestamp as determined by the caller.</param>
-        /// <param name="snapshotPolicy">The snapshot policy to use to determine whether a new shapshot should be created.</param>
+        /// <param name="timestamp">The (optional) nominal current wall clock timestamp as determined by the caller.</param>
+        /// <param name="snapshotPolicy">The (optional) snapshot policy to use to determine whether a new shapshot should be created.</param>
         /// <returns>The aggregate with all new events committed.</returns>
-        ValueTask<TAggregate> CommitAsync<TAggregate, TSnapshotPolicy>(TAggregate aggregate, long timestamp, TSnapshotPolicy snapshotPolicy = default)
+        ValueTask<TAggregate> CommitAsync<TAggregate, TSnapshotPolicy>(TAggregate aggregate, long timestamp = -1, TSnapshotPolicy snapshotPolicy = default)
             where TAggregate : IAggregateRoot<TAggregate>
             where TSnapshotPolicy : struct, IAggregateWriterSnapshotPolicy<TAggregate>;
     }

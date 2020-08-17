@@ -165,6 +165,23 @@ namespace Corvus.EventStore.Aggregates
         }
 
         /// <summary>
+        /// Applies the given event to the aggregate.
+        /// </summary>
+        /// <typeparam name="TPayload">The type of the payload for the event.</typeparam>
+        /// <param name="eventType">The type of the event.</param>
+        /// <param name="payload">The payload for the event.</param>
+        /// <returns>The aggregate with the event applied.</returns>
+        public AggregateWithMemento<TEventHandler, TMemento> ApplyEvent<TPayload>(string eventType, in TPayload payload)
+        {
+            return this.ApplyEvent(
+                new Event<TPayload>(
+                    eventType,
+                    this.EventSequenceNumber + 1,
+                    DateTimeOffset.Now.UtcTicks,
+                    payload));
+        }
+
+        /// <summary>
         /// Applies the given commits to the aggregate.
         /// </summary>
         /// <param name="commits">The ordered list of commits to apply to the aggregate.</param>

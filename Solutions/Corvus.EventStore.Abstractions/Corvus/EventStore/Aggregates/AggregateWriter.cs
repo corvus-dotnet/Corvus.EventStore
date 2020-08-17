@@ -35,14 +35,14 @@ namespace Corvus.EventStore.Aggregates
         /// <inheritdoc/>
         public async ValueTask<TAggregate> CommitAsync<TAggregate, TSnapshotPolicy>(
             TAggregate aggregate,
-            long timestamp,
+            long timestamp = -1,
             TSnapshotPolicy snapshotPolicy = default)
             where TAggregate : IAggregateRoot<TAggregate>
             where TSnapshotPolicy : struct, IAggregateWriterSnapshotPolicy<TAggregate>
         {
             aggregate = await aggregate.CommitAsync(this.eventWriter).ConfigureAwait(false);
 
-            if (snapshotPolicy.ShouldSnapshot(aggregate, timestamp))
+            if (snapshotPolicy.ShouldSnapshot(aggregate, timestamp == -1 ? DateTimeOffset.Now.UtcTicks : timestamp))
             {
                 try
                 {

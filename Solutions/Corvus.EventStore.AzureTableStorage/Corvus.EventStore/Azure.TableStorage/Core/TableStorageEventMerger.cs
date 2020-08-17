@@ -30,7 +30,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
         // This is the maximum amount of time we may have to look back on any instance
         // for items with aged timestamps due to retrying commits.
-        private static readonly long MaxTimeoutDelay = TimeSpan.FromMilliseconds(10000).Ticks;
+        private static readonly long MaxTimeoutDelay = TimeSpan.FromMilliseconds(30000).Ticks;
 
         // Ensure we flush at least once a second
         private static readonly TimeSpan FlushTimeout = TimeSpan.FromMilliseconds(1000);
@@ -124,6 +124,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                         filter = TableQuery.CombineFilters(filter, TableOperators.Or, newFilter);
                                     }
                                 }
+
+                                Console.WriteLine(filter);
 
                                 TableQuery<DynamicTableEntity> query = new TableQuery<DynamicTableEntity>().Where(filter);
                                 IEnumerable<DynamicTableEntity> results = outputTable.ExecuteQuery(query);
