@@ -9,7 +9,6 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     using System.Collections.Immutable;
     using System.Diagnostics;
     using System.Linq;
-    using System.Runtime.CompilerServices;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
     using Corvus.EventStore.Core;
