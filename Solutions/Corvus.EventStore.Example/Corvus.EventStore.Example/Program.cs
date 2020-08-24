@@ -55,7 +55,7 @@ namespace Corvus.EventStore.Example
 
             IConfigurationRoot config = builder.Build();
 
-            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), true, true).ConfigureAwait(false);
+            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), config.GetConnectionString("TableStorageConnectionStringAllStream"), true, true).ConfigureAwait(false);
 
             Console.ReadKey();
         }
@@ -361,7 +361,7 @@ namespace Corvus.EventStore.Example
             }
         }
 
-        private static async Task RunWithMultiPartitionTableStorageInAzureAsync(string connectionString, bool writeMore = true, bool startEventMerger = true)
+        private static async Task RunWithMultiPartitionTableStorageInAzureAsync(string connectionString, string allStreamConnectionString, bool writeMore = true, bool startEventMerger = true)
         {
             // Configure the database (in this case our cloud table factories)
             // This would typically be done while you are setting up the container
@@ -372,9 +372,14 @@ namespace Corvus.EventStore.Example
             var eventTableFactoryP3 = new EventCloudTableFactory(connectionString, "mwacorvusevents3");
             var eventTableFactoryP4 = new EventCloudTableFactory(connectionString, "mwacorvusevents4");
             var eventTableFactoryP5 = new EventCloudTableFactory(connectionString, "mwacorvusevents5");
-            var eventTableFactory = new PartitionedEventCloudTableFactory<EventCloudTableFactory>(eventTableFactoryP1, eventTableFactoryP2, eventTableFactoryP3, eventTableFactoryP4, eventTableFactoryP5);
+            var eventTableFactoryP6 = new EventCloudTableFactory(connectionString, "mwacorvusevents6");
+            var eventTableFactoryP7 = new EventCloudTableFactory(connectionString, "mwacorvusevents7");
+            var eventTableFactoryP8 = new EventCloudTableFactory(connectionString, "mwacorvusevents8");
+            var eventTableFactoryP9 = new EventCloudTableFactory(connectionString, "mwacorvusevents9");
+            var eventTableFactoryP10 = new EventCloudTableFactory(connectionString, "mwacorvusevents10");
+            var eventTableFactory = new PartitionedEventCloudTableFactory<EventCloudTableFactory>(eventTableFactoryP1, eventTableFactoryP2, eventTableFactoryP3, eventTableFactoryP4, eventTableFactoryP5, eventTableFactoryP6, eventTableFactoryP7, eventTableFactoryP8, eventTableFactoryP9, eventTableFactoryP10);
             var snapshotTableFactory = new SnapshotCloudTableFactory(connectionString, "mwacorvussnapshots");
-            var allStreamTableFactory = new AllStreamCloudTableFactory(connectionString, "mwacorvusallstream");
+            var allStreamTableFactory = new AllStreamCloudTableFactory(allStreamConnectionString, "mwacorvusallstream");
 
             // Now were done, start the merger, just to see whether that works.
             TableStorageEventMerger<PartitionedEventCloudTableFactory<EventCloudTableFactory>, AllStreamCloudTableFactory>? eventMerger = null;
@@ -409,9 +414,9 @@ namespace Corvus.EventStore.Example
 
                     const int batchSize = 625;
                     const int initializationBatchSize = 625;
-                    const int iterations = 10;
+                    const int iterations = 10000;
                     const int nodesPerAggregate = 8;
-                    const int maxRatePerNode = 2000;
+                    const int maxRatePerNode = 1000;
 
                     var aggregates = new ToDoList[aggregateIds.Length];
 
@@ -422,9 +427,6 @@ namespace Corvus.EventStore.Example
                     var loadSw = Stopwatch.StartNew();
                     for (int i = 0; i < (int)Math.Ceiling((double)aggregateIds.Length / initializationBatchSize); ++i)
                     {
-                        ////IEnumerable<int> range = Enumerable.Range(initializationBatchSize * i, Math.Min(initializationBatchSize, aggregates.Length - (initializationBatchSize * i)));
-                        ////ToDoList[] results = await Task.WhenAll(range.Select(index => ToDoList.ReadAsync(reader, aggregateIds[index], aggregateIds[index].ToString()).AsTask()).ToList()).ConfigureAwait(false);
-
                         for (int index = 0; index < initializationBatchSize; ++index)
                         {
                             Guid id = aggregateIds[(initializationBatchSize * i) + index];

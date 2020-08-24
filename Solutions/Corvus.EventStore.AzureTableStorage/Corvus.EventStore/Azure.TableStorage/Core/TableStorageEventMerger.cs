@@ -7,6 +7,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     using System;
     using System.Collections.Generic;
     using System.Collections.Immutable;
+    using System.Diagnostics;
     using System.Linq;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
@@ -236,8 +237,13 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                 tasks.Add(Task.Factory.StartNew(() => GetCommitsFor(query, table)));
             }
 
+            Console.WriteLine("Finding new commits.");
+
+            var sw = Stopwatch.StartNew();
             List<DynamicTableEntity>[] commits = await Task.WhenAll(tasks).ConfigureAwait(false);
             IEnumerable<DynamicTableEntity> flattenedCommits = commits.SelectMany(i => i);
+            sw.Stop();
+            Console.WriteLine($"Found {flattenedCommits.Count()} in {sw.ElapsedMilliseconds / 1000.0} seconds");
             return flattenedCommits;
         }
 

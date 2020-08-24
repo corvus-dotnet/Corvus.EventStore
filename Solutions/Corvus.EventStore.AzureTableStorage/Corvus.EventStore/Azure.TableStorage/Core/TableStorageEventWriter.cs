@@ -44,9 +44,6 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         private static readonly TableRequestOptions Options =
             new TableRequestOptions
             {
-                MaximumExecutionTime = TimeSpan.FromMilliseconds(3000),
-                ServerTimeout = TimeSpan.FromMilliseconds(1500),
-                RetryPolicy = new NoRetry(),
             };
 
         private readonly IEventCloudTableFactory cloudTableFactory;
