@@ -26,11 +26,6 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     {
         private const int MaxBatchSize = 99;
 
-        // We rebuild the "events we have seen" set ever other iteration.
-        // We could have a more sophisticated time-based eviction
-        private const long RebuildAfterNPartitions = 1;
-
-        // We assume that events we see may have been up to 1 additional partition in arrears from the current partition
         private const int PartitionLatency = 1;
 
         private const string AllStreamPartitionKey = "allstreamitems";
@@ -107,15 +102,13 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
                                 Console.WriteLine();
                                 Console.WriteLine("Building existing commit list.");
-                                HashSet<(Guid, long)> commitsWeHaveSeen = BuildCommitsWeHaveSeen(outputTable, lastPartition);
+                                MemoryCache commitsWeHaveSeen = BuildCommitsWeHaveSeen(outputTable, lastPartition);
                                 Console.WriteLine();
                                 Console.WriteLine($"Build commit list - {commitsWeHaveSeen.Count} commits.");
 
                                 int previousCount = commitsWeHaveSeen.Count;
 
                                 int originalCount = commitsWeHaveSeen.Count;
-
-                                long previousPartition = -1;
 
                                 while (true)
                                 {
@@ -132,17 +125,6 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
                                     // Let's go back and look at the events from the time when we sarted this run through, plus one partition of leeway.
                                     startingTimestampTicks = currentTime - TimeInAPartition;
-
-                                    long latestPartition = GetPartitionForTimestamp(startingTimestampTicks);
-                                    if (latestPartition > previousPartition + RebuildAfterNPartitions)
-                                    {
-                                        if (previousPartition != -1)
-                                        {
-                                            commitsWeHaveSeen = BuildCommitsWeHaveSeen(outputTable, latestPartition);
-                                        }
-
-                                        previousPartition = latestPartition;
-                                    }
                                 }
                             }
                             catch (OperationCanceledException)
@@ -186,7 +168,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             return long.MaxValue - long.Parse(partitionKey.Substring(AllStreamPartitionKey.Length));
         }
 
-        private static async Task<long> WriteNewCommits(ImmutableArray<CloudTable> inputTables, CloudTable outputTable, HashSet<(Guid, long)> commitsWeHaveSeen, long startingTimestampTicks, long startingCommitSequenceNumber)
+        private static async Task<long> WriteNewCommits(ImmutableArray<CloudTable> inputTables, CloudTable outputTable, MemoryCache commitsWeHaveSeen, long startingTimestampTicks, long startingCommitSequenceNumber)
         {
             IEnumerable<DynamicTableEntity> flattenedCommits = await EnumerateCommits(inputTables, startingTimestampTicks).ConfigureAwait(false);
 
@@ -199,7 +181,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             {
                 (Guid, long) currentCommit = (commit.Properties[TableStorageEventWriter.CommitAggregateId].GuidValue!.Value, commit.Properties[TableStorageEventWriter.CommitSequenceNumber].Int64Value!.Value);
 
-                if (commitsWeHaveSeen.Contains(currentCommit))
+                if (commitsWeHaveSeen.TryGetValue(currentCommit, out (Guid, long) result))
                 {
                     continue;
                 }
@@ -208,7 +190,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
                 AddInsertOperationToBatch(batch, partitionKey, commitSequenceNumber, commit);
                 commitSequenceNumber++;
-                commitsWeHaveSeen.Add(currentCommit);
+                SetCacheEntry(commitsWeHaveSeen, currentCommit);
 
                 if (batchCount == MaxBatchSize)
                 {
@@ -264,9 +246,9 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             return table.ExecuteQuery(query, Options).ToList();
         }
 
-        private static HashSet<(Guid, long)> BuildCommitsWeHaveSeen(CloudTable outputTable, long latestPartition, int partitionLatency = PartitionLatency)
+        private static MemoryCache BuildCommitsWeHaveSeen(CloudTable outputTable, long latestPartition, int partitionLatency = PartitionLatency)
         {
-            var commitsWeHaveSeen = new HashSet<(Guid, long)>();
+            var commitsWeHaveSeen = new MemoryCache(optionsAccessor: new MemoryCacheOptions { ExpirationScanFrequency = TimeSpan.FromTicks(TimeInAPartition) });
 
             TableQuery<DynamicTableEntity> query =
                 new TableQuery<DynamicTableEntity>
@@ -282,10 +264,16 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             IEnumerable<DynamicTableEntity> results = outputTable.ExecuteQuery(query, Options);
             foreach (DynamicTableEntity result in results)
             {
-                commitsWeHaveSeen.Add((result.Properties[AllStreamCommitAggregateId].GuidValue!.Value, result.Properties[AllStreamCommitSequenceNumber].Int64Value!.Value));
+                (Guid, long) item = (result.Properties[AllStreamCommitAggregateId].GuidValue!.Value, result.Properties[AllStreamCommitSequenceNumber].Int64Value!.Value);
+                SetCacheEntry(commitsWeHaveSeen, item);
             }
 
             return commitsWeHaveSeen;
+        }
+
+        private static (Guid, long) SetCacheEntry(MemoryCache commitsWeHaveSeen, (Guid, long) item)
+        {
+            return commitsWeHaveSeen.Set(item, item, TimeSpan.FromTicks(TimeInAPartition * PartitionLatency));
         }
 
         private static string BuildPartitionKey(long startingTimestampTicks)
