@@ -30,6 +30,16 @@ namespace Corvus.EventStore.Azure.TableStorage.Core.Internal
         }
 
         /// <summary>
+        /// Deserialize an event list.
+        /// </summary>
+        /// <param name="events">The Utf8 encoded binary JSON representation of the list.</param>
+        /// <returns>An <see cref="ImmutableArray{T}"/> of <see cref="SerializedEvent"/>.</returns>
+        public static ImmutableArray<SerializedEvent> DeserializeEventList(string events)
+        {
+            return JsonSerializer.Deserialize<ImmutableArray<SerializedEvent>>(events, Options);
+        }
+
+        /// <summary>
         /// Serializes the event list.
         /// </summary>
         /// <param name="events">The events to serialize.</param>

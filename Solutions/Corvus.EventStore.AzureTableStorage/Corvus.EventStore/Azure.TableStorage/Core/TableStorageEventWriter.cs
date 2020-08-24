@@ -65,7 +65,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             commitEntity.Properties[CommitPartitionKey] = new EntityProperty(commit.PartitionKey);
             commitEntity.Properties[CommitSequenceNumber] = new EntityProperty(commit.SequenceNumber);
             commitEntity.Properties[CommitTimestamp] = new EntityProperty(commit.Timestamp);
-            commitEntity.Properties[CommitEvents] = new EntityProperty(Utf8JsonEventListSerializer.SerializeEventListToString(commit.Events));
+            commitEntity.Properties[CommitEvents] = new EntityProperty(Utf8JsonEventListSerializer.SerializeEventList(commit.Events));
 
             CloudTable table = this.cloudTableFactory.GetTable(commit.AggregateId, commit.PartitionKey);
 
@@ -81,7 +81,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                     TableResult result = await table.ExecuteAsync(TableOperation.Retrieve<DynamicTableEntity>(commitEntity.PartitionKey, commitEntity.RowKey)).ConfigureAwait(false);
                     var storedEntity = (DynamicTableEntity)result.Result;
                     if (storedEntity.Properties[CommitTimestamp].Int64Value != commitEntity.Properties[CommitTimestamp].Int64Value ||
-                        storedEntity.Properties[CommitEvents].StringValue != commitEntity.Properties[CommitEvents].StringValue)
+                        storedEntity.Properties[CommitEvents].BinaryValue != commitEntity.Properties[CommitEvents].BinaryValue)
                     {
                         throw new ConcurrencyException($"Unable to write the commit for aggregateID {commit.AggregateId} with sequence number {commit.SequenceNumber}.", ex);
                     }

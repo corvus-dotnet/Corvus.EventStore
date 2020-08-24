@@ -9,10 +9,10 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     using System.Collections.Immutable;
     using System.Diagnostics;
     using System.Linq;
-    using System.Security.Cryptography;
     using System.Threading.Tasks;
+    using Corvus.CommitStore.Azure.TableStorage.Core.Internal;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
-    using Corvus.Extensions;
+    using Corvus.EventStore.Azure.TableStorage.Core.Internal;
     using Corvus.Retry;
     using Microsoft.Azure.Cosmos.Table;
     using Microsoft.Extensions.Caching.Memory;
@@ -28,12 +28,22 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     {
         private const int MaxBatchSize = 99;
 
+        // Maximum number of messages in the inner batch
+        private const int MaxInnerBatchLength = 500;
+
+        // If we allow 99 items, and a 4MB maximum payload size that seems to permit around 40k for the row payload
+        // (which is < the 64k we are allowed for a single column).
+        // By the time we have dealt with the json encoding, base64 etc. our
+        // base payload length will be about 4 times the raw size calculated. So this gives us a maximum for our batch payload.
+        private const int MaxBatchPayloadLength = (int)(40 * 1024 / 4);
+
         private const int PartitionLatency = 1;
 
         private const string AllStreamPartitionKey = "allstreamitems";
         private const string AllStreamStateRowKey = "allstreamstate";
         private const string AllStreamCommitAggregateId = "CommitAggregateId";
         private const string AllStreamCommitSequenceNumber = "CommitSequenceNumber";
+        private const string AllStreamCommitList = "CommitList";
         private const string AllStreamStateNextSequenceNumber = "NextSequenceNumber";
         private const string AllStreamStateStartingTimestampTicks = "StartingTimestampTicks";
 
@@ -48,6 +58,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                 PayloadFormat = TablePayloadFormat.Json,
                 RetryPolicy = new NoRetry(),
                 TableQueryEnableScan = true,
+                ProjectSystemProperties = true,
             };
 
         private readonly ReliableTaskRunner mergeRunner;
@@ -126,7 +137,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                         long elaspedTime = DateTimeOffset.Now.UtcTicks - currentTime;
 
                                         Console.WriteLine();
-                                        Console.WriteLine($"Written {commitsWeHaveSeen.Count - previousCount} commits (Total: {commitsWeHaveSeen.Count - originalCount} commits in {TimeSpan.FromTicks(elaspedTime).TotalSeconds} == {(commitsWeHaveSeen.Count - previousCount) / TimeSpan.FromTicks(elaspedTime).TotalSeconds} commits/s)");
+                                        Console.WriteLine($"Written {commitsWeHaveSeen.Count - previousCount} commits in {TimeSpan.FromTicks(elaspedTime).TotalSeconds} == {(commitsWeHaveSeen.Count - previousCount) / TimeSpan.FromTicks(elaspedTime).TotalSeconds} commits/s (Total: {commitsWeHaveSeen.Count - originalCount} commits)");
                                         previousCount = commitsWeHaveSeen.Count;
                                     }
 
@@ -198,6 +209,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             long commitSequenceNumber = startingCommitSequenceNumber;
             string partitionKey = BuildPartitionKey(DateTimeOffset.Now.UtcTicks);
 
+            var innerBatch = new List<BatchedCommit>(MaxInnerBatchLength);
             foreach (DynamicTableEntity commit in flattenedCommits)
             {
                 (Guid, long) currentCommit = (commit.Properties[TableStorageEventWriter.CommitAggregateId].GuidValue!.Value, commit.Properties[TableStorageEventWriter.CommitSequenceNumber].Int64Value!.Value);
@@ -207,9 +219,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                     continue;
                 }
 
-                batchCount++;
-
-                AddInsertOperationToBatch(batch, partitionKey, commitSequenceNumber, commit);
+                batchCount += AddInnerBatchOperation(batch, innerBatch, partitionKey, commitSequenceNumber, commit);
                 commitSequenceNumber++;
                 SetCacheEntry(commitsWeHaveSeen, currentCommit);
 
@@ -224,6 +234,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
             if (batchCount > 0)
             {
+                CompleteBatch(batch, innerBatch);
                 await CommitBatch(outputTable, batch, partitionKey, commitSequenceNumber, startingTimestampTicks).ConfigureAwait(false);
             }
 
@@ -239,11 +250,33 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             await outputTable.ExecuteBatchAsync(batch, Options, null).ConfigureAwait(false);
         }
 
-        private static void AddInsertOperationToBatch(TableBatchOperation batch, string partitionKey, long commitSequenceNumber, DynamicTableEntity commit)
+        private static void CompleteBatch(TableBatchOperation batch, List<BatchedCommit> innerBatch)
         {
-            var allStreamCommit = new DynamicTableEntity(partitionKey, commitSequenceNumber.ToString("D21"));
-            allStreamCommit.Properties.AddRange(commit.Properties);
-            batch.Add(TableOperation.Insert(allStreamCommit));
+            if (innerBatch.Count == 0)
+            {
+                return;
+            }
+
+            // We take the PK and RK from our initial batch value (so we will have gaps in the sequence number corresponding to the batch length)
+            var commitBatch = new DynamicTableEntity(innerBatch[0].PartitionKey, innerBatch[0].RowKey);
+            byte[] serializedBatch = Utf8JsonCommitListSerializer.SerializeCommitList(innerBatch);
+            commitBatch.Properties.Add(TableStorageEventMerger<TInputCloudTableFactory, TOutputCloudTableFactory>.AllStreamCommitList, new EntityProperty(serializedBatch));
+            batch.Add(TableOperation.Insert(commitBatch));
+            innerBatch.Clear();
+        }
+
+        private static int AddInnerBatchOperation(TableBatchOperation batch, List<BatchedCommit> innerBatch, string partitionKey, long commitSequenceNumber, DynamicTableEntity commit)
+        {
+            int result = 0;
+            var allStreamCommit = new BatchedCommit(commit, partitionKey, commitSequenceNumber);
+            if (innerBatch.Count == MaxInnerBatchLength || innerBatch.Sum(i => i.Length) + allStreamCommit.Length > MaxBatchPayloadLength)
+            {
+                CompleteBatch(batch, innerBatch);
+                result = 1;
+            }
+
+            innerBatch.Add(allStreamCommit);
+            return result;
         }
 
         private static async Task<IEnumerable<DynamicTableEntity>> EnumerateCommits(ImmutableArray<CloudTable> inputTables, TableContinuationToken?[] inputTokens, bool[] completedSources, long startingTimestampTicks)
@@ -314,19 +347,25 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                         TableOperators.And,
                         TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.NotEqual, AllStreamStateRowKey)));
 
+            query.SelectColumns.Add(AllStreamCommitList);
+
             IEnumerable<DynamicTableEntity> results = outputTable.ExecuteQuery(query, Options);
-            foreach (DynamicTableEntity result in results)
+            foreach (DynamicTableEntity batch in results)
             {
-                (Guid, long) item = (result.Properties[AllStreamCommitAggregateId].GuidValue!.Value, result.Properties[AllStreamCommitSequenceNumber].Int64Value!.Value);
-                SetCacheEntry(commitsWeHaveSeen, item);
+                List<BatchedCommit> commits = Utf8JsonCommitListSerializer.DeserializeCommitList(batch.Properties[AllStreamCommitList].BinaryValue);
+                foreach (BatchedCommit result in commits)
+                {
+                    (Guid, long) item = (result.CommitAggregateId, result.CommitSequenceNumber);
+                    SetCacheEntry(commitsWeHaveSeen, item);
+                }
             }
 
             return commitsWeHaveSeen;
         }
 
-        private static (Guid, long) SetCacheEntry(MemoryCache commitsWeHaveSeen, (Guid, long) item)
+        private static void SetCacheEntry(MemoryCache commitsWeHaveSeen, (Guid, long) item)
         {
-            return commitsWeHaveSeen.Set(item, item, TimeSpan.FromTicks(TimeInAPartition * PartitionLatency));
+            commitsWeHaveSeen.Set(item, true, TimeSpan.FromTicks(TimeInAPartition * (PartitionLatency + 1)));
         }
 
         private static string BuildPartitionKey(long startingTimestampTicks)
