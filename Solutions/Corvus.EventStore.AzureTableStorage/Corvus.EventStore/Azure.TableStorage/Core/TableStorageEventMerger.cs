@@ -7,14 +7,13 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     using System;
     using System.Collections.Generic;
     using System.Collections.Immutable;
-    using System.Diagnostics;
     using System.Linq;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
-    using Corvus.EventStore.Core;
     using Corvus.Extensions;
     using Corvus.Retry;
     using Microsoft.Azure.Cosmos.Table;
+    using Microsoft.Extensions.Caching.Memory;
 
     /// <summary>
     /// Merges commits from one cloud table factory into an output cloud table factory, across all aggregates.
@@ -27,16 +26,32 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     {
         private const int MaxBatchSize = 99;
 
-        // This is the maximum amount of time we may have to look back on any instance
-        // for items with aged timestamps due to retrying commits.
-        private static readonly long MaxTimeoutDelay = TimeSpan.FromMilliseconds(30000).Ticks;
+        // We rebuild the "events we have seen" set ever other iteration.
+        // We could have a more sophisticated time-based eviction
+        private const long RebuildAfterNPartitions = 1;
 
-        // Ensure we flush at least once a second
-        private static readonly TimeSpan FlushTimeout = TimeSpan.FromMilliseconds(1000);
+        // We assume that events we see may have been up to 1 additional partition in arrears from the current partition
+        private const int PartitionLatency = 1;
 
-        private static readonly TimeSpan DelayOnNoResults = TimeSpan.FromMilliseconds(250);
+        private const string AllStreamPartitionKey = "allstreamitems";
+        private const string AllStreamStateRowKey = "allstreamstate";
+        private const string AllStreamCommitAggregateId = "CommitAggregateId";
+        private const string AllStreamCommitSequenceNumber = "CommitSequenceNumber";
+        private const string AllStreamStateNextSequenceNumber = "NextSequenceNumber";
+        private const string AllStreamStateStartingTimestampTicks = "StartingTimestampTicks";
 
         private static readonly long MinAzureUtcDateTicks = new DateTimeOffset(1601, 1, 1, 0, 0, 0, TimeSpan.Zero).UtcTicks;
+        private static readonly long TimeInAPartition = TimeSpan.FromMinutes(10).Ticks;
+
+        private static readonly TableRequestOptions Options =
+            new TableRequestOptions
+            {
+                LocationMode = LocationMode.PrimaryOnly,
+                ConsistencyLevel = Microsoft.Azure.Cosmos.ConsistencyLevel.Session,
+                PayloadFormat = TablePayloadFormat.Json,
+                RetryPolicy = new NoRetry(),
+                TableQueryEnableScan = true,
+            };
 
         private readonly ReliableTaskRunner mergeRunner;
 
@@ -73,9 +88,6 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         /// </summary>
         private static ReliableTaskRunner Start(TInputCloudTableFactory inputFactory, TOutputCloudTableFactory outputFactory)
         {
-            string pk = "allstreamitems";
-            string rk = "latestinternalcheckpoint";
-
             ImmutableArray<CloudTable> inputTables = inputFactory.GetTables();
             CloudTable outputTable = outputFactory.GetTable();
 
@@ -85,232 +97,217 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                     return Task.Factory.StartNew<Task<Task>>(
                         async () =>
                         {
-                            // First, load the last checkpoint
-                            var operation = TableOperation.Retrieve<DynamicTableEntity>(pk, rk);
-                            TableResult tableResult = await outputTable.ExecuteAsync(operation).ConfigureAwait(false);
-                            DynamicTableEntity checkpointsEntity = (DynamicTableEntity)tableResult.Result ?? new DynamicTableEntity(pk, rk);
-
-                            long[] checkpointTimestamps = Enumerable.Repeat(MinAzureUtcDateTicks + MaxTimeoutDelay, inputTables.Length).ToArray();
-
-                            long allStreamIndex = 0;
-
-                            ImmutableHashSet<(Guid, long)> lastFoundItems = ImmutableHashSet<(Guid, long)>.Empty;
-
-                            if (tableResult.HttpStatusCode == 200)
+                            try
                             {
-                                for (int i = 0; i < checkpointTimestamps.Length; ++i)
+                                Console.WriteLine();
+                                Console.WriteLine("Getting starting sequence number.");
+                                (long startingCommitSequenceNumber, long startingTimestampTicks, long lastPartition) = GetStartPointers(outputTable);
+                                Console.WriteLine($"Starting sequence number: {startingCommitSequenceNumber}");
+                                Console.WriteLine($"Starting timestamp: {CreateDateFromTicksAndZeroOffset(startingTimestampTicks)}");
+
+                                Console.WriteLine();
+                                Console.WriteLine("Building existing commit list.");
+                                HashSet<(Guid, long)> commitsWeHaveSeen = BuildCommitsWeHaveSeen(outputTable, lastPartition);
+                                Console.WriteLine();
+                                Console.WriteLine($"Build commit list - {commitsWeHaveSeen.Count} commits.");
+
+                                int previousCount = commitsWeHaveSeen.Count;
+
+                                int originalCount = commitsWeHaveSeen.Count;
+
+                                long previousPartition = -1;
+
+                                while (true)
                                 {
-                                    checkpointTimestamps[i] = checkpointsEntity.Properties[$"checkpointtimestamp{i}"].Int64Value!.Value;
-                                }
-
-                                allStreamIndex = checkpointsEntity.Properties["allStreamIndex"].Int64Value!.Value;
-
-                                string filter = string.Empty;
-
-                                for (int sourceIndex = 0; sourceIndex < checkpointTimestamps.Length; ++sourceIndex)
-                                {
-                                    string newFilter =
-                                    TableQuery.CombineFilters(
-                                        TableQuery.GenerateFilterConditionForDate("CommitOriginalTimestamp", QueryComparisons.GreaterThan, new DateTimeOffset(checkpointTimestamps[sourceIndex] - MaxTimeoutDelay, TimeSpan.Zero)),
-                                        TableOperators.And,
-                                        TableQuery.GenerateFilterConditionForInt("CommitOriginalSource", QueryComparisons.Equal, sourceIndex));
-                                    if (filter.Length == 0)
+                                    long currentTime = DateTimeOffset.Now.UtcTicks;
+                                    startingCommitSequenceNumber = await WriteNewCommits(inputTables, outputTable, commitsWeHaveSeen, startingTimestampTicks, startingCommitSequenceNumber).ConfigureAwait(false);
+                                    if (commitsWeHaveSeen.Count - previousCount > 0)
                                     {
-                                        filter = newFilter;
-                                    }
-                                    else
-                                    {
-                                        filter = TableQuery.CombineFilters(filter, TableOperators.Or, newFilter);
-                                    }
-                                }
+                                        long elaspedTime = DateTimeOffset.Now.UtcTicks - currentTime;
 
-                                Console.WriteLine(filter);
-
-                                TableQuery<DynamicTableEntity> query = new TableQuery<DynamicTableEntity>().Where(filter);
-                                IEnumerable<DynamicTableEntity> results = outputTable.ExecuteQuery(query);
-                                ImmutableHashSet<(Guid, long)>.Builder builder = ImmutableHashSet.CreateBuilder<(Guid, long)>();
-
-                                foreach (DynamicTableEntity? result in results)
-                                {
-                                    builder.Add((result.Properties["Commit" + nameof(Commit.AggregateId)].GuidValue!.Value, result.Properties["Commit" + nameof(Commit.SequenceNumber)].Int64Value!.Value));
-                                }
-
-                                lastFoundItems = builder.ToImmutable();
-                            }
-                            else
-                            {
-                                checkpointsEntity = new DynamicTableEntity(pk, rk);
-
-                                // Set up the allstream index and checkpoints
-                                for (int i = 0; i < checkpointTimestamps.Length; ++i)
-                                {
-                                    checkpointsEntity.Properties[$"checkpointtimestamp{i}"] = new EntityProperty(checkpointTimestamps[i]);
-                                }
-
-                                checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
-                            }
-
-                            var queries = new TableQuery<DynamicTableEntity>[inputTables.Length];
-                            var currentTokens = new TableContinuationToken?[inputTables.Length];
-                            var tasks = new Task<TableQuerySegment<DynamicTableEntity>?>[inputTables.Length];
-
-                            DateTimeOffset lastFlush = DateTimeOffset.Now;
-                            int batchCount = 0;
-                            var batch = new TableBatchOperation();
-                            Task<TableBatchResult>? batchTask = null;
-
-                            while (true)
-                            {
-                                ImmutableHashSet<(Guid, long)>.Builder currentFoundItems = ImmutableHashSet.CreateBuilder<(Guid, long)>();
-                                try
-                                {
-                                    bool firstTime = true;
-
-                                    // Create the queries for each of the tables in the input stream.
-                                    for (int i = 0; i < queries.Length; ++i)
-                                    {
-                                        queries[i] =
-                                            new TableQuery<DynamicTableEntity>()
-                                                 .Where(
-                                                    TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThan, new DateTimeOffset(checkpointTimestamps[i] - MaxTimeoutDelay, TimeSpan.Zero)))
-                                                 .OrderBy("Timestamp");
+                                        Console.WriteLine();
+                                        Console.WriteLine($"Written {commitsWeHaveSeen.Count - previousCount} commits (Total: {commitsWeHaveSeen.Count - originalCount} commits in {TimeSpan.FromTicks(elaspedTime).TotalSeconds} == {(commitsWeHaveSeen.Count - previousCount) / TimeSpan.FromTicks(elaspedTime).TotalSeconds} commits/s)");
+                                        previousCount = commitsWeHaveSeen.Count;
                                     }
 
-                                    bool foundResults = false;
+                                    // Let's go back and look at the events from the time when we sarted this run through, plus one partition of leeway.
+                                    startingTimestampTicks = currentTime - TimeInAPartition;
 
-                                    do
+                                    long latestPartition = GetPartitionForTimestamp(startingTimestampTicks);
+                                    if (latestPartition > previousPartition + RebuildAfterNPartitions)
                                     {
-                                        // Execute the queries
-                                        for (int i = 0; i < queries.Length; ++i)
+                                        if (previousPartition != -1)
                                         {
-                                            if (firstTime || currentTokens[i] != null)
-                                            {
-                                                tasks[i] = inputTables[i].ExecuteQuerySegmentedAsync(queries[i], currentTokens[i]);
-                                            }
-                                            else
-                                            {
-                                                tasks[i] = Task.FromResult<TableQuerySegment<DynamicTableEntity>?>(null);
-                                            }
+                                            commitsWeHaveSeen = BuildCommitsWeHaveSeen(outputTable, latestPartition);
                                         }
 
-                                        var sw = Stopwatch.StartNew();
-                                        TableQuerySegment<DynamicTableEntity>?[] segments = await Task.WhenAll(tasks).ConfigureAwait(false);
-                                        sw.Stop();
-
-                                        for (int i = 0; i < segments.Length; ++i)
-                                        {
-                                            TableQuerySegment<DynamicTableEntity>? segment = segments[i];
-                                            if (segment is null)
-                                            {
-                                                currentTokens[i] = null;
-                                                continue;
-                                            }
-
-                                            currentTokens[i] = segment.ContinuationToken;
-                                            foreach (DynamicTableEntity result in segment.Results.OrderBy(r => r.Timestamp))
-                                            {
-                                                (Guid, long) foundItem = (result.Properties["Commit" + nameof(Commit.AggregateId)].GuidValue!.Value, result.Properties["Commit" + nameof(Commit.SequenceNumber)].Int64Value!.Value);
-                                                currentFoundItems.Add(foundItem);
-
-                                                if (!lastFoundItems.Contains(foundItem))
-                                                {
-                                                    var dte = new DynamicTableEntity(pk, allStreamIndex.ToString("D21"));
-                                                    dte.Properties.AddRange(result.Properties);
-                                                    dte.Properties.Add("CommitOriginalTimestamp", new EntityProperty(result.Timestamp));
-                                                    dte.Properties.Add("CommitSource", new EntityProperty(i));
-                                                    foundResults = true;
-                                                    allStreamIndex += 1;
-                                                    checkpointTimestamps[i] = Math.Max(checkpointTimestamps[i], result.Timestamp.UtcTicks);
-                                                    var insertOperation = TableOperation.Insert(dte);
-                                                    batch.Add(insertOperation);
-                                                    batchCount++;
-
-                                                    if (batchCount == MaxBatchSize)
-                                                    {
-                                                        // Only update the all stream index while we are mid-query segment
-                                                        checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
-                                                        var checkpointOperation = TableOperation.InsertOrReplace(checkpointsEntity);
-                                                        batch.Add(checkpointOperation);
-                                                        if (batchTask != null)
-                                                        {
-                                                            // Wait for the previous insert to complete.
-                                                            await HandleBatchResult(batchTask).ConfigureAwait(false);
-                                                        }
-
-                                                        // Stash it away and carry on.
-                                                        batchTask = outputTable.ExecuteBatchAsync(batch);
-                                                        batch = new TableBatchOperation();
-                                                        batchCount = 0;
-                                                        lastFlush = DateTimeOffset.Now;
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        firstTime = false;
-
-                                        if (token.IsCancellationRequested)
-                                        {
-                                            return Task.CompletedTask;
-                                        }
-                                    }
-                                    while (currentTokens.Any(currentToken => currentToken != null));
-
-                                    if (batchTask != null)
-                                    {
-                                        // Wait for the previous insert to complete.
-                                        await HandleBatchResult(batchTask).ConfigureAwait(false);
-                                        batchTask = null;
-                                    }
-
-                                    if (DateTimeOffset.Now - lastFlush > FlushTimeout)
-                                    {
-                                        UpdateCheckpointsEntity(checkpointsEntity, checkpointTimestamps, allStreamIndex);
-                                        var writeOperation = TableOperation.InsertOrReplace(checkpointsEntity);
-                                        batch.Add(writeOperation);
-                                        await outputTable.ExecuteBatchAsync(batch).ConfigureAwait(false);
-                                        batch = new TableBatchOperation();
-                                        batchCount = 0;
-                                        lastFlush = DateTimeOffset.Now;
-                                    }
-
-                                    if (!foundResults)
-                                    {
-                                        await Task.Delay(DelayOnNoResults).ConfigureAwait(false);
+                                        previousPartition = latestPartition;
                                     }
                                 }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine(ex);
-                                }
-
-                                lastFoundItems = currentFoundItems.ToImmutable();
                             }
-                        }, token);
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception ex)
+                            {
+                                // Move this into a logger
+                                Console.WriteLine(ex);
+                                throw;
+                            }
+                        });
                 },
                 new Retry.Policies.AnyExceptionPolicy());
         }
 
-        private static async Task HandleBatchResult(Task<TableBatchResult> batchTask)
+        private static (long nextSequenceNumber, long startingTimestampTicks, long lastPartition) GetStartPointers(CloudTable outputTable)
         {
-            TableBatchResult batchResults = await batchTask.ConfigureAwait(false);
-            foreach (TableResult batchResult in batchResults)
+            TableQuery query =
+                new TableQuery()
+                    .Where(
+                    TableQuery.CombineFilters(
+                        TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.GreaterThanOrEqual, BuildPartitionKey(long.MaxValue)),
+                        TableOperators.And,
+                        TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, AllStreamStateRowKey)))
+                    .Take(1);
+
+            var results = outputTable.ExecuteQuery(query, Options).ToList();
+
+            if (results.Count > 0)
             {
-                if (batchResult.HttpStatusCode < 200 || batchResult.HttpStatusCode > 299)
-                {
-                    throw new Exception($"Batch failed with HttpStatusCode {batchResult.HttpStatusCode}.");
-                }
+                return (results[0].Properties[AllStreamStateNextSequenceNumber].Int64Value!.Value, results[0].Properties[AllStreamStateStartingTimestampTicks].Int64Value!.Value, GetPartitionFromPartitionKey(results[0].PartitionKey));
             }
+
+            return (0, MinAzureUtcDateTicks, 0);
         }
 
-        private static void UpdateCheckpointsEntity(DynamicTableEntity checkpointsEntity, long[] checkpointTimestamps, long allStreamIndex)
+        private static long GetPartitionFromPartitionKey(string partitionKey)
         {
-            for (int j = 0; j < checkpointTimestamps.Length; ++j)
+            return long.MaxValue - long.Parse(partitionKey.Substring(AllStreamPartitionKey.Length));
+        }
+
+        private static async Task<long> WriteNewCommits(ImmutableArray<CloudTable> inputTables, CloudTable outputTable, HashSet<(Guid, long)> commitsWeHaveSeen, long startingTimestampTicks, long startingCommitSequenceNumber)
+        {
+            IEnumerable<DynamicTableEntity> flattenedCommits = await EnumerateCommits(inputTables, startingTimestampTicks).ConfigureAwait(false);
+
+            var batch = new TableBatchOperation();
+            int batchCount = 0;
+            long commitSequenceNumber = startingCommitSequenceNumber;
+            string partitionKey = BuildPartitionKey(DateTimeOffset.Now.UtcTicks);
+
+            foreach (DynamicTableEntity commit in flattenedCommits)
             {
-                checkpointsEntity.Properties[$"checkpointtimestamp{j}"] = new EntityProperty(checkpointTimestamps[j]);
+                (Guid, long) currentCommit = (commit.Properties[TableStorageEventWriter.CommitAggregateId].GuidValue!.Value, commit.Properties[TableStorageEventWriter.CommitSequenceNumber].Int64Value!.Value);
+
+                if (commitsWeHaveSeen.Contains(currentCommit))
+                {
+                    continue;
+                }
+
+                batchCount++;
+
+                AddInsertOperationToBatch(batch, partitionKey, commitSequenceNumber, commit);
+                commitSequenceNumber++;
+                commitsWeHaveSeen.Add(currentCommit);
+
+                if (batchCount == MaxBatchSize)
+                {
+                    await CommitBatch(outputTable, batch, partitionKey, commitSequenceNumber, startingTimestampTicks).ConfigureAwait(false);
+                    batchCount = 0;
+                    batch = new TableBatchOperation();
+                    partitionKey = BuildPartitionKey(DateTimeOffset.Now.UtcTicks);
+                }
             }
 
-            checkpointsEntity.Properties["allStreamIndex"] = new EntityProperty(allStreamIndex);
+            if (batchCount > 0)
+            {
+                await CommitBatch(outputTable, batch, partitionKey, commitSequenceNumber, startingTimestampTicks).ConfigureAwait(false);
+            }
+
+            return commitSequenceNumber;
+        }
+
+        private static async Task CommitBatch(CloudTable outputTable, TableBatchOperation batch, string partitionKey, long commitSequenceNumber, long startingTimestampTicks)
+        {
+            var state = new DynamicTableEntity(partitionKey, AllStreamStateRowKey);
+            state.Properties.Add(AllStreamStateNextSequenceNumber, new EntityProperty(commitSequenceNumber));
+            state.Properties.Add(AllStreamStateStartingTimestampTicks, new EntityProperty(startingTimestampTicks));
+            batch.Add(TableOperation.InsertOrReplace(state));
+            await outputTable.ExecuteBatchAsync(batch, Options, null).ConfigureAwait(false);
+        }
+
+        private static void AddInsertOperationToBatch(TableBatchOperation batch, string partitionKey, long commitSequenceNumber, DynamicTableEntity commit)
+        {
+            var allStreamCommit = new DynamicTableEntity(partitionKey, commitSequenceNumber.ToString("D21"));
+            allStreamCommit.Properties.AddRange(commit.Properties);
+            batch.Add(TableOperation.Insert(allStreamCommit));
+        }
+
+        private static async Task<IEnumerable<DynamicTableEntity>> EnumerateCommits(ImmutableArray<CloudTable> inputTables, long startingTimestampTicks)
+        {
+            var tasks = new List<Task<List<DynamicTableEntity>>>();
+            foreach (CloudTable table in inputTables)
+            {
+                TableQuery query = new TableQuery()
+                    .Where(
+                        TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThanOrEqual, CreateDateFromTicksAndZeroOffset(startingTimestampTicks)));
+                tasks.Add(Task.Factory.StartNew(() => GetCommitsFor(query, table)));
+            }
+
+            List<DynamicTableEntity>[] commits = await Task.WhenAll(tasks).ConfigureAwait(false);
+            IEnumerable<DynamicTableEntity> flattenedCommits = commits.SelectMany(i => i);
+            return flattenedCommits;
+        }
+
+        private static List<DynamicTableEntity> GetCommitsFor(TableQuery query, CloudTable table)
+        {
+            return table.ExecuteQuery(query, Options).ToList();
+        }
+
+        private static HashSet<(Guid, long)> BuildCommitsWeHaveSeen(CloudTable outputTable, long latestPartition, int partitionLatency = PartitionLatency)
+        {
+            var commitsWeHaveSeen = new HashSet<(Guid, long)>();
+
+            TableQuery<DynamicTableEntity> query =
+                new TableQuery<DynamicTableEntity>
+                {
+                    SelectColumns = new List<string> { TableStorageEventMerger<TInputCloudTableFactory, TOutputCloudTableFactory>.AllStreamCommitAggregateId, TableStorageEventMerger<TInputCloudTableFactory, TOutputCloudTableFactory>.AllStreamCommitSequenceNumber },
+                }
+                .Where(
+                    TableQuery.CombineFilters(
+                        TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.GreaterThanOrEqual, GetPartitionKeyFor(latestPartition + partitionLatency)),
+                        TableOperators.And,
+                        TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.NotEqual, AllStreamStateRowKey)));
+
+            IEnumerable<DynamicTableEntity> results = outputTable.ExecuteQuery(query, Options);
+            foreach (DynamicTableEntity result in results)
+            {
+                commitsWeHaveSeen.Add((result.Properties[AllStreamCommitAggregateId].GuidValue!.Value, result.Properties[AllStreamCommitSequenceNumber].Int64Value!.Value));
+            }
+
+            return commitsWeHaveSeen;
+        }
+
+        private static string BuildPartitionKey(long startingTimestampTicks)
+        {
+            long partition = GetPartitionForTimestamp(startingTimestampTicks);
+            return GetPartitionKeyFor(partition);
+        }
+
+        private static string GetPartitionKeyFor(long partition)
+        {
+            // We are doing a reverse order for our partition key
+            return AllStreamPartitionKey + (long.MaxValue - partition).ToString("D21");
+        }
+
+        private static long GetPartitionForTimestamp(long startingTimestampTicks)
+        {
+            return startingTimestampTicks / TimeInAPartition;
+        }
+
+        private static DateTimeOffset CreateDateFromTicksAndZeroOffset(long startingTimestampTicks)
+        {
+            return new DateTimeOffset(startingTimestampTicks, TimeSpan.Zero);
         }
     }
 
@@ -327,6 +324,9 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         /// <param name="inputCloudTableFactory">The input cloud table factory.</param>
         /// <param name="outputCloudTableFactory">The output cloud table factory.</param>
         /// <returns>The instance of the <see cref="TableStorageEventMerger{TInputCloudTableFactory, TOutputCloudTableFactory}"/>.</returns>
+        /// <remarks>
+        /// You should ensure that the "starting" timestamp is sufficiently far in the past to ensure that you are missing no events across any partition.
+        /// </remarks>
         public static TableStorageEventMerger<TInputCloudTableFactory1, TOutputCloudTableFactory1> From<TInputCloudTableFactory1, TOutputCloudTableFactory1>(TInputCloudTableFactory1 inputCloudTableFactory, TOutputCloudTableFactory1 outputCloudTableFactory)
             where TInputCloudTableFactory1 : IEventCloudTableFactory
             where TOutputCloudTableFactory1 : IAllStreamCloudTableFactory

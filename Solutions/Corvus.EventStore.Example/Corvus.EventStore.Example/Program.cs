@@ -415,7 +415,7 @@ namespace Corvus.EventStore.Example
 
                     var aggregates = new ToDoList[aggregateIds.Length];
 
-                    Console.Write("Initializing aggregates");
+                    Console.WriteLine("Initializing aggregates");
 
                     var initTaskList = new Task<ToDoList>[initializationBatchSize];
 
@@ -433,7 +433,6 @@ namespace Corvus.EventStore.Example
 
                         ToDoList[] results = await Task.WhenAll(initTaskList).ConfigureAwait(false);
                         results.CopyTo(aggregates, initializationBatchSize * i);
-                        Console.Write(".");
                     }
 
                     loadSw.Stop();

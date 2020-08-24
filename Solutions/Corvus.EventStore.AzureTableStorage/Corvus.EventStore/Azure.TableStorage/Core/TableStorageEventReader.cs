@@ -54,14 +54,14 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                 continuationToken = result.ContinuationToken;
                 foreach (DynamicTableEntity commitEntity in result.Results)
                 {
-                    byte[] entityListAsBinary = commitEntity.Properties["Commit" + nameof(Commit.Events)].BinaryValue;
+                    byte[] entityListAsBinary = commitEntity.Properties[TableStorageEventWriter.CommitEvents].BinaryValue;
                     ImmutableArray<SerializedEvent> events = Utf8JsonEventListSerializer.DeserializeEventList(entityListAsBinary);
 
                     var commit = new Commit(
-                        commitEntity.Properties["Commit" + nameof(Commit.AggregateId)].GuidValue!.Value,
-                        commitEntity.Properties["Commit" + nameof(Commit.PartitionKey)].StringValue,
-                        commitEntity.Properties["Commit" + nameof(Commit.SequenceNumber)].Int64Value!.Value,
-                        commitEntity.Properties["Commit" + nameof(Commit.Timestamp)].Int64Value!.Value,
+                        commitEntity.Properties[TableStorageEventWriter.CommitAggregateId].GuidValue!.Value,
+                        commitEntity.Properties[TableStorageEventWriter.CommitPartitionKey].StringValue,
+                        commitEntity.Properties[TableStorageEventWriter.CommitSequenceNumber].Int64Value!.Value,
+                        commitEntity.Properties[TableStorageEventWriter.CommitTimestamp].Int64Value!.Value,
                         events);
                     resultBuilder.Add(commit);
 
