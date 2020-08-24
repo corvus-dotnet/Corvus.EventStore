@@ -71,6 +71,6 @@ namespace Corvus.EventStore.Azure.TableStorage.Core.Internal
         /// <summary>
         /// Gets the length of the record.
         /// </summary>
-        public int Length => sizeof(long) + sizeof(long) + ((this.CommitPartitionKey.Length + this.PartitionKey.Length + this.RowKey.Length) * sizeof(char)) + 16;
+        public int Length => sizeof(long) + sizeof(long) + ((this.CommitPartitionKey.Length + this.PartitionKey.Length + this.RowKey.Length) * sizeof(char)) + 16 + this.CommitEvents.Length;
     }
 }

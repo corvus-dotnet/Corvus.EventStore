@@ -417,10 +417,11 @@ namespace Corvus.EventStore.Example
                     const int iterations = 50;
                     const int nodesPerAggregate = 8;
                     const int maxRatePerNode = 1000;
+                    const int eventsPerCommit = 8;
 
                     var aggregates = new ToDoList[aggregateIds.Length];
 
-                    Console.WriteLine("Initializing aggregates");
+                    Console.WriteLine("Initializing aggregates.");
 
                     var initTaskList = new Task<ToDoList>[initializationBatchSize];
 
@@ -439,7 +440,7 @@ namespace Corvus.EventStore.Example
 
                     loadSw.Stop();
 
-                    Console.WriteLine($"Loaded {aggregateIds.Length} in {loadSw.ElapsedMilliseconds / 1000.0} seconds ({aggregateIds.Length / (loadSw.ElapsedMilliseconds / 1000.0)} agg/sec)");
+                    Console.WriteLine($"Loaded {aggregateIds.Length} aggregates in {loadSw.ElapsedMilliseconds / 1000.0} seconds ({aggregateIds.Length / (loadSw.ElapsedMilliseconds / 1000.0)} agg/sec)");
 
                     Console.WriteLine();
 
@@ -463,7 +464,11 @@ namespace Corvus.EventStore.Example
                                 for (int taskCount = 0; taskCount < batchSize; ++taskCount)
                                 {
                                     ToDoList toDoList = aggregates[(batch * batchSize) + taskCount];
-                                    toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
+                                    for (int eventCount = 0; eventCount < eventsPerCommit; ++eventCount)
+                                    {
+                                        toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
+                                    }
+
                                     ValueTask<ToDoList> task = toDoList.CommitAsync(writer);
                                     taskList[taskCount] = task.AsTask();
                                 }
@@ -475,6 +480,7 @@ namespace Corvus.EventStore.Example
                             sw.Stop();
 
                             Console.WriteLine($"{aggregateIds.Length * nodesPerAggregate} commits in {sw.ElapsedMilliseconds}, ({(aggregateIds.Length * nodesPerAggregate) / (sw.ElapsedMilliseconds / 1000.0)} commits/s)");
+                            Console.WriteLine($"{(aggregateIds.Length * nodesPerAggregate * eventsPerCommit) / (sw.ElapsedMilliseconds / 1000.0)} events/s");
                         }
 
                         double elapsed = (DateTimeOffset.Now - startTime).TotalMilliseconds;
@@ -491,6 +497,7 @@ namespace Corvus.EventStore.Example
 
                     executeSw.Stop();
                     Console.WriteLine($"Executed {aggregateIds.Length * iterations * nodesPerAggregate} atomic commits in {executeSw.ElapsedMilliseconds / 1000.0} seconds ({aggregateIds.Length * iterations * nodesPerAggregate / (executeSw.ElapsedMilliseconds / 1000.0)} ) commits/sec");
+                    Console.WriteLine($"({aggregateIds.Length * iterations * nodesPerAggregate * eventsPerCommit / (executeSw.ElapsedMilliseconds / 1000.0)} ) events/sec");
                 }
             }
             finally
