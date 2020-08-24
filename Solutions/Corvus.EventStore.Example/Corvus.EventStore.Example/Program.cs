@@ -414,7 +414,7 @@ namespace Corvus.EventStore.Example
 
                     const int batchSize = 625;
                     const int initializationBatchSize = 625;
-                    const int iterations = 10000;
+                    const int iterations = 50;
                     const int nodesPerAggregate = 8;
                     const int maxRatePerNode = 1000;
 

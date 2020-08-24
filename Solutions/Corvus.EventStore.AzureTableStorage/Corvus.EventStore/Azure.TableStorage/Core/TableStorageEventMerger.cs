@@ -9,6 +9,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     using System.Collections.Immutable;
     using System.Diagnostics;
     using System.Linq;
+    using System.Security.Cryptography;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
     using Corvus.Extensions;
@@ -86,6 +87,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         {
             ImmutableArray<CloudTable> inputTables = inputFactory.GetTables();
             CloudTable outputTable = outputFactory.GetTable();
+            var inputTokens = new TableContinuationToken[inputTables.Length];
+            bool[] completedSources = new bool[inputTables.Length];
 
             return ReliableTaskRunner.Run(
                 token =>
@@ -111,10 +114,13 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
                                 int originalCount = commitsWeHaveSeen.Count;
 
+                                long initialTime = DateTimeOffset.Now.UtcTicks;
+
                                 while (true)
                                 {
                                     long currentTime = DateTimeOffset.Now.UtcTicks;
-                                    startingCommitSequenceNumber = await WriteNewCommits(inputTables, outputTable, commitsWeHaveSeen, startingTimestampTicks, startingCommitSequenceNumber).ConfigureAwait(false);
+
+                                    startingCommitSequenceNumber = await WriteNewCommits(inputTables, inputTokens, completedSources, outputTable, commitsWeHaveSeen, startingTimestampTicks, startingCommitSequenceNumber).ConfigureAwait(false);
                                     if (commitsWeHaveSeen.Count - previousCount > 0)
                                     {
                                         long elaspedTime = DateTimeOffset.Now.UtcTicks - currentTime;
@@ -125,7 +131,13 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                     }
 
                                     // Let's go back and look at the events from the time when we sarted this run through, plus one partition of leeway.
-                                    startingTimestampTicks = currentTime - TimeInAPartition;
+                                    if (completedSources.All(t => t))
+                                    {
+                                        // Once they are all completed, we go round again with a new starting timestamp
+                                        startingTimestampTicks = initialTime - TimeInAPartition;
+                                        initialTime = DateTimeOffset.Now.UtcTicks;
+                                        ResetCompletedSources(completedSources);
+                                    }
                                 }
                             }
                             catch (OperationCanceledException)
@@ -141,6 +153,14 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                         });
                 },
                 new Retry.Policies.AnyExceptionPolicy());
+        }
+
+        private static void ResetCompletedSources(bool[] completedSources)
+        {
+            for (int i = 0; i < completedSources.Length; ++i)
+            {
+                completedSources[i] = false;
+            }
         }
 
         private static (long nextSequenceNumber, long startingTimestampTicks, long lastPartition) GetStartPointers(CloudTable outputTable)
@@ -169,9 +189,9 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             return long.MaxValue - long.Parse(partitionKey.Substring(AllStreamPartitionKey.Length));
         }
 
-        private static async Task<long> WriteNewCommits(ImmutableArray<CloudTable> inputTables, CloudTable outputTable, MemoryCache commitsWeHaveSeen, long startingTimestampTicks, long startingCommitSequenceNumber)
+        private static async Task<long> WriteNewCommits(ImmutableArray<CloudTable> inputTables, TableContinuationToken[] inputTokens, bool[] completedSources, CloudTable outputTable, MemoryCache commitsWeHaveSeen, long startingTimestampTicks, long startingCommitSequenceNumber)
         {
-            IEnumerable<DynamicTableEntity> flattenedCommits = await EnumerateCommits(inputTables, startingTimestampTicks).ConfigureAwait(false);
+            IEnumerable<DynamicTableEntity> flattenedCommits = await EnumerateCommits(inputTables, inputTokens, completedSources, startingTimestampTicks).ConfigureAwait(false);
 
             var batch = new TableBatchOperation();
             int batchCount = 0;
@@ -226,30 +246,57 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             batch.Add(TableOperation.Insert(allStreamCommit));
         }
 
-        private static async Task<IEnumerable<DynamicTableEntity>> EnumerateCommits(ImmutableArray<CloudTable> inputTables, long startingTimestampTicks)
+        private static async Task<IEnumerable<DynamicTableEntity>> EnumerateCommits(ImmutableArray<CloudTable> inputTables, TableContinuationToken?[] inputTokens, bool[] completedSources, long startingTimestampTicks)
         {
-            var tasks = new List<Task<List<DynamicTableEntity>>>();
-            foreach (CloudTable table in inputTables)
+            var tasks = new List<Task<TableQuerySegment<DynamicTableEntity>?>>();
+            for (int i = 0; i < inputTables.Length; ++i)
             {
+                CloudTable table = inputTables[i];
+                TableContinuationToken? token = inputTokens[i];
+
+                if (completedSources[i])
+                {
+                    tasks.Add(Task.FromResult<TableQuerySegment<DynamicTableEntity>?>(null));
+                    continue;
+                }
+
                 TableQuery query = new TableQuery()
                     .Where(
                         TableQuery.GenerateFilterConditionForDate("Timestamp", QueryComparisons.GreaterThanOrEqual, CreateDateFromTicksAndZeroOffset(startingTimestampTicks)));
-                tasks.Add(Task.Factory.StartNew(() => GetCommitsFor(query, table)));
+
+                tasks.Add(GetCommitsFor(query, table, token));
             }
 
             Console.WriteLine("Finding new commits.");
 
             var sw = Stopwatch.StartNew();
-            List<DynamicTableEntity>[] commits = await Task.WhenAll(tasks).ConfigureAwait(false);
-            IEnumerable<DynamicTableEntity> flattenedCommits = commits.SelectMany(i => i);
+            TableQuerySegment<DynamicTableEntity>?[] commits = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+            for (int i = 0; i < commits.Length; ++i)
+            {
+                TableQuerySegment<DynamicTableEntity>? commit = commits[i];
+
+                if (commit is null)
+                {
+                    continue;
+                }
+
+                inputTokens[i] = commit.ContinuationToken;
+                if (commit.ContinuationToken is null)
+                {
+                    completedSources[i] = true;
+                }
+            }
+
+            IEnumerable<DynamicTableEntity> flattenedCommits = commits.SelectMany(i => i?.Results ?? Enumerable.Empty<DynamicTableEntity>());
             sw.Stop();
             Console.WriteLine($"Found {flattenedCommits.Count()} in {sw.ElapsedMilliseconds / 1000.0} seconds");
             return flattenedCommits;
         }
 
-        private static List<DynamicTableEntity> GetCommitsFor(TableQuery query, CloudTable table)
+        private static Task<TableQuerySegment<DynamicTableEntity>?> GetCommitsFor(TableQuery query, CloudTable table, TableContinuationToken? token)
         {
-            return table.ExecuteQuery(query, Options).ToList();
+            return table.ExecuteQuerySegmentedAsync(query, token, Options, null);
         }
 
         private static MemoryCache BuildCommitsWeHaveSeen(CloudTable outputTable, long latestPartition, int partitionLatency = PartitionLatency)
