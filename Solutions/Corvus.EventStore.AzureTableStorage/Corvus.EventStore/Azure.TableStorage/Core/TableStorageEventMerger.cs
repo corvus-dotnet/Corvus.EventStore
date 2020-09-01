@@ -242,7 +242,8 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                 }
             }
 
-            if (batchCount > 0)
+            // If we have any in the batch, or the inner batch, we need to complete the batch and commit.
+            if (batchCount > 0 || innerBatch.Count > 0)
             {
                 CompleteBatch(batch, innerBatch);
                 await CommitBatch(outputTable, batch, partitionKey, commitSequenceNumber, startingTimestampTicks).ConfigureAwait(false);
