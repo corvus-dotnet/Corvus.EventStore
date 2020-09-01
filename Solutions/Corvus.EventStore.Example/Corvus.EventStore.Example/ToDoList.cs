@@ -44,7 +44,7 @@ namespace Corvus.EventStore.Example
         /// <param name="reader">The reader from which to read the aggregate.</param>
         /// <param name="aggregateId">The id of the aggregate to read.</param>
         /// <param name="partitionKey">The partition key of the aggregate to read.</param>
-        /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
+        /// <param name="commitSequenceNumber">The (optional) commit sequence number to which to read the aggregate.</param>
         /// <param name="cancellationToken">The (optional) cancelation token for the operation.</param>
         /// <returns>A <see cref="ValueTask"/> which completes with the to do list.</returns>
         public static async ValueTask<ToDoList> ReadAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue, CancellationToken cancellationToken = default)
@@ -61,7 +61,7 @@ namespace Corvus.EventStore.Example
         /// <param name="reader">The reader from which to read the aggregate.</param>
         /// <param name="aggregateId">The id of the aggregate to read.</param>
         /// <param name="partitionKey">The partition key of the aggregate to read.</param>
-        /// <param name="commitSequenceNumber">The (optional) commit sequence number at which to read the aggregate.</param>
+        /// <param name="commitSequenceNumber">The (optional) commit sequence number to which to read the aggregate.</param>
         /// <returns>A <see cref="ValueTask"/> which completes with the to do list.</returns>
         public static async ValueTask<ToDoList> ReadToLastSnapshotAsync<TReader>(TReader reader, Guid aggregateId, string partitionKey, long commitSequenceNumber = long.MaxValue)
             where TReader : IAggregateReader
