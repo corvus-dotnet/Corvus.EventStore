@@ -18,8 +18,8 @@ namespace Corvus.EventStore.Core
         /// </summary>
         /// <param name="aggregateId">The Id of the aggregate to retrieve commited events for.</param>
         /// <param name="partitionKey">The partition key of the aggregate.</param>
-        /// <param name="fromSequenceNumber">The minimum <see cref="Event{T}.SequenceNumber"/> to retrieve.</param>
-        /// <param name="toSequenceNumber">The maximum <see cref="Event{T}.SequenceNumber"/> to retreive.</param>
+        /// <param name="fromSequenceNumber">The minimum <see cref="Commit.SequenceNumber"/> to retrieve.</param>
+        /// <param name="toSequenceNumber">The maximum <see cref="Commit.SequenceNumber"/> to retreive.</param>
         /// <param name="maxItems">The maximum number of items to return.</param>
         /// <param name="cancellationToken">The cancellation token to abort the operation..</param>
         /// <returns>The results, contained in an <see cref="EventReaderResult"/>.</returns>
