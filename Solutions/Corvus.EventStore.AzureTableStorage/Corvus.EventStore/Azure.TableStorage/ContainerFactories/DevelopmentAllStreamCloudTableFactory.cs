@@ -4,6 +4,7 @@
 
 namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
 {
+    using Corvus.EventStore.Azure.TableStorage.Core;
     using Microsoft.Azure.Cosmos.Table;
 
     /// <summary>
@@ -24,7 +25,10 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
             CloudStorageAccount account = CloudStorageAccount.DevelopmentStorageAccount;
             this.client = account.CreateCloudTableClient(new TableClientConfiguration());
             this.table = GetTableReference(this.client, tableName);
-            this.table.CreateIfNotExists();
+            if (this.table.CreateIfNotExists())
+            {
+                TableStorageEventMerger.SetCreationTimestamp(this.table);
+            }
         }
 
         /// <summary>
@@ -36,6 +40,12 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
         public CloudTable GetTable()
         {
             return this.table;
+        }
+
+        /// <inheritdoc/>
+        public long GetCreationTimestamp()
+        {
+            return TableStorageEventMerger.GetCreationTimestamp(this.table);
         }
 
         private static CloudTable GetTableReference(CloudTableClient client, string tableName)

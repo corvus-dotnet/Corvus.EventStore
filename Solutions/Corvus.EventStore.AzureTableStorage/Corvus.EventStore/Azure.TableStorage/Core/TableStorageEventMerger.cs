@@ -39,16 +39,11 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
         private const int PartitionLatency = 1;
 
-        private const string AllStreamPartitionKey = "allstreamitems";
         private const string AllStreamStateRowKey = "allstreamstate";
-        private const string AllStreamCommitAggregateId = "CommitAggregateId";
-        private const string AllStreamCommitSequenceNumber = "CommitSequenceNumber";
-        private const string AllStreamCommitList = "CommitList";
         private const string AllStreamStateNextSequenceNumber = "NextSequenceNumber";
         private const string AllStreamStateStartingTimestampTicks = "StartingTimestampTicks";
 
         private static readonly long MinAzureUtcDateTicks = new DateTimeOffset(1601, 1, 1, 0, 0, 0, TimeSpan.Zero).UtcTicks;
-        private static readonly long TimeInAPartition = TimeSpan.FromSeconds(30).Ticks;
         private static readonly object CacheObject = new object();
 
         private static readonly TableRequestOptions Options =
@@ -140,7 +135,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                                 while (true)
                                 {
                                     long currentTime = DateTimeOffset.Now.UtcTicks;
-                                    string partitionKey = BuildPartitionKey(currentTime);
+                                    string partitionKey = TableStorageEventMerger.BuildPartitionKey(currentTime);
                                     startingCommitSequenceNumber = await WriteNewCommits(partitionKey, inputTables, inputTokens, completedSources, outputTable, commitsWeHaveSeen, startingTimestampTicks, startingCommitSequenceNumber).ConfigureAwait(false);
                                     if (startingCommitSequenceNumber - previousCommitSequenceNumber > 0)
                                     {
@@ -192,7 +187,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                 new TableQuery()
                     .Where(
                     TableQuery.CombineFilters(
-                        TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.GreaterThanOrEqual, BuildPartitionKey(long.MaxValue)),
+                        TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.GreaterThanOrEqual, TableStorageEventMerger.BuildPartitionKey(long.MaxValue)),
                         TableOperators.And,
                         TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, AllStreamStateRowKey)))
                     .Take(1);
@@ -201,15 +196,10 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
             if (results.Count > 0)
             {
-                return (results[0].Properties[AllStreamStateNextSequenceNumber].Int64Value!.Value, results[0].Properties[AllStreamStateStartingTimestampTicks].Int64Value!.Value, GetPartitionFromPartitionKey(results[0].PartitionKey));
+                return (results[0].Properties[AllStreamStateNextSequenceNumber].Int64Value!.Value, results[0].Properties[AllStreamStateStartingTimestampTicks].Int64Value!.Value, TableStorageEventMerger.GetPartitionFromPartitionKey(results[0].PartitionKey));
             }
 
             return (0, MinAzureUtcDateTicks, 0);
-        }
-
-        private static long GetPartitionFromPartitionKey(string partitionKey)
-        {
-            return long.MaxValue - long.Parse(partitionKey.Substring(AllStreamPartitionKey.Length));
         }
 
         private static async Task<long> WriteNewCommits(string partitionKey, ImmutableArray<CloudTable> inputTables, TableContinuationToken[] inputTokens, bool[] completedSources, CloudTable outputTable, MemoryCache commitsWeHaveSeen, long startingTimestampTicks, long startingCommitSequenceNumber)
@@ -273,10 +263,10 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
                 return;
             }
 
-            // We take the PK and RK from our initial batch value (so we will have gaps in the sequence number corresponding to the batch length)
-            var commitBatch = new DynamicTableEntity(innerBatch[0].PartitionKey, innerBatch[0].RowKey);
+            // We take the PK and RK from our last batch value so that we can find items greater than or equal to some starting batch number (so we will have gaps in the sequence number corresponding to the batch length)
+            var commitBatch = new DynamicTableEntity(innerBatch[0].PartitionKey, innerBatch[^1].RowKey);
             byte[] serializedBatch = Utf8JsonCommitListSerializer.SerializeCommitList(innerBatch);
-            commitBatch.Properties.Add(TableStorageEventMerger<TInputCloudTableFactory, TOutputCloudTableFactory>.AllStreamCommitList, new EntityProperty(serializedBatch));
+            commitBatch.Properties.Add(TableStorageEventMerger.AllStreamCommitList, new EntityProperty(serializedBatch));
             batch.Add(TableOperation.Insert(commitBatch));
             innerBatch.Clear();
         }
@@ -348,25 +338,26 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
         private static MemoryCache BuildCommitsWeHaveSeen(CloudTable outputTable, long latestPartition, int partitionLatency = PartitionLatency)
         {
-            var commitsWeHaveSeen = new MemoryCache(optionsAccessor: new MemoryCacheOptions { ExpirationScanFrequency = TimeSpan.FromTicks(TimeInAPartition) });
+            var commitsWeHaveSeen = new MemoryCache(optionsAccessor: new MemoryCacheOptions { ExpirationScanFrequency = TimeSpan.FromTicks(TableStorageEventMerger.TimeInAPartition) });
 
             TableQuery<DynamicTableEntity> query =
                 new TableQuery<DynamicTableEntity>
                 {
-                    SelectColumns = new List<string> { TableStorageEventMerger<TInputCloudTableFactory, TOutputCloudTableFactory>.AllStreamCommitAggregateId, TableStorageEventMerger<TInputCloudTableFactory, TOutputCloudTableFactory>.AllStreamCommitSequenceNumber },
+                    SelectColumns = new List<string> { TableStorageEventMerger.AllStreamCommitList },
                 }
                 .Where(
                     TableQuery.CombineFilters(
-                        TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.LessThanOrEqual, GetPartitionKeyFor(latestPartition - partitionLatency)),
+                        TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.LessThanOrEqual, TableStorageEventMerger.GetPartitionKeyFor(latestPartition - partitionLatency)),
                         TableOperators.And,
-                        TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.NotEqual, AllStreamStateRowKey)));
-
-            query.SelectColumns.Add(AllStreamCommitList);
+                        TableQuery.CombineFilters(
+                            TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.NotEqual, AllStreamStateRowKey),
+                            TableOperators.And,
+                            TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.NotEqual, TableStorageEventMerger.TableCreationTimestamp))));
 
             IEnumerable<DynamicTableEntity> results = outputTable.ExecuteQuery(query, Options);
             foreach (DynamicTableEntity batch in results)
             {
-                List<BatchedCommit> commits = Utf8JsonCommitListSerializer.DeserializeCommitList(batch.Properties[AllStreamCommitList].BinaryValue);
+                List<BatchedCommit> commits = TableStorageEventMerger.GetBatchedCommits(batch);
                 foreach (BatchedCommit result in commits)
                 {
                     (Guid, long) item = (result.CommitAggregateId, result.CommitSequenceNumber);
@@ -379,24 +370,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
 
         private static void SetCacheEntry(MemoryCache commitsWeHaveSeen, (Guid, long) item)
         {
-            commitsWeHaveSeen.Set(item, CacheObject, TimeSpan.FromTicks(TimeInAPartition * (PartitionLatency + 1)));
-        }
-
-        private static string BuildPartitionKey(long startingTimestampTicks)
-        {
-            long partition = GetPartitionForTimestamp(startingTimestampTicks);
-            return GetPartitionKeyFor(partition);
-        }
-
-        private static string GetPartitionKeyFor(long partition)
-        {
-            // We are doing a reverse order for our partition key
-            return AllStreamPartitionKey + (long.MaxValue - partition).ToString("D21");
-        }
-
-        private static long GetPartitionForTimestamp(long startingTimestampTicks)
-        {
-            return startingTimestampTicks / TimeInAPartition;
+            commitsWeHaveSeen.Set(item, CacheObject, TimeSpan.FromTicks(TableStorageEventMerger.TimeInAPartition * (PartitionLatency + 1)));
         }
 
         private static DateTimeOffset CreateDateFromTicksAndZeroOffset(long startingTimestampTicks)
@@ -410,6 +384,26 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
     /// </summary>
     public static class TableStorageEventMerger
     {
+        /// <summary>
+        /// The commit list property.
+        /// </summary>
+        internal const string AllStreamCommitList = "CommitList";
+
+        /// <summary>
+        /// The table creation timestamp partition key.
+        /// </summary>
+        internal const string TableCreationTimestamp = "TableCreationTimestamp";
+
+        /// <summary>
+        /// Gets the amount of time to spend in a partition.
+        /// </summary>
+        internal static readonly long TimeInAPartition = TimeSpan.FromSeconds(30).Ticks;
+
+        /// <summary>
+        /// The root of the partition key for the all stream.
+        /// </summary>
+        private const string AllStreamPartitionKey = "allstreamitems";
+
         /// <summary>
         /// Creates a <see cref="TableStorageEventMerger{TInputCloudTableFactory, TOutputCloudTableFactory}"/> from the given input and output factories.
         /// </summary>
@@ -426,6 +420,98 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             where TOutputCloudTableFactory1 : IAllStreamCloudTableFactory
         {
             return new TableStorageEventMerger<TInputCloudTableFactory1, TOutputCloudTableFactory1>(inputCloudTableFactory, outputCloudTableFactory);
+        }
+
+        /// <summary>
+        /// Gets a query which can retrieve all the rows in a particular partition.
+        /// </summary>
+        /// <param name="partition">The partition to retrieve.</param>
+        /// <param name="sequenceNumber">The sequence number from which to retrieve rows.</param>
+        /// <returns>A query which will filter to the specific partition, and any sequence numbers gerater than or equal to the specified sequence number.</returns>
+        internal static TableQuery<DynamicTableEntity> GetQueryForPartition(long partition, long sequenceNumber)
+        {
+            return new TableQuery<DynamicTableEntity>()
+                .Where(
+                    TableQuery.CombineFilters(
+                        TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, GetPartitionKeyFor(partition)),
+                        TableOperators.And,
+                        TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, sequenceNumber.ToString("D21"))));
+        }
+
+        /// <summary>
+        /// Gets the partition for a particular timestamp.
+        /// </summary>
+        /// <param name="startingTimestampTicks">The timestamp for the partition.</param>
+        /// <returns>The partition for the timestamp.</returns>
+        internal static long GetPartitionForTimestamp(long startingTimestampTicks)
+        {
+            return startingTimestampTicks / TimeInAPartition;
+        }
+
+        /// <summary>
+        /// Gets the partition key for a given partition.
+        /// </summary>
+        /// <param name="partition">The partition for which to retrieve the key.</param>
+        /// <returns>The key for the partition.</returns>
+        internal static string GetPartitionKeyFor(long partition)
+        {
+            // We are doing a reverse order for our partition key
+            return AllStreamPartitionKey + (long.MaxValue - partition).ToString("D21");
+        }
+
+        /// <summary>
+        /// Gets the parition from a partition key.
+        /// </summary>
+        /// <param name="partitionKey">The partition key for which to retrieve the partition.</param>
+        /// <returns>The partition represented by the partition key.</returns>
+        internal static long GetPartitionFromPartitionKey(string partitionKey)
+        {
+            return long.MaxValue - long.Parse(partitionKey.Substring(AllStreamPartitionKey.Length));
+        }
+
+        /// <summary>
+        /// Builds a partition key from a timestamp.
+        /// </summary>
+        /// <param name="startingTimestampTicks">The timestamp which will be bucketed into a partition from which a partition key is built.</param>
+        /// <returns>The partition key corresponding to the partition containing this timestamp.</returns>
+        internal static string BuildPartitionKey(long startingTimestampTicks)
+        {
+            long partition = GetPartitionForTimestamp(startingTimestampTicks);
+            return GetPartitionKeyFor(partition);
+        }
+
+        /// <summary>
+        /// Gets the batched commits for a dynamic table entity.
+        /// </summary>
+        /// <param name="batch">The <see cref="DynamicTableEntity"/> from which to retrieve the batched commits.</param>
+        /// <returns>The list of batched commits.</returns>
+        internal static List<BatchedCommit> GetBatchedCommits(DynamicTableEntity batch)
+        {
+            return Utf8JsonCommitListSerializer.DeserializeCommitList(batch.Properties[AllStreamCommitList].BinaryValue);
+        }
+
+        /// <summary>
+        /// Set the creation timestamp.
+        /// </summary>
+        /// <param name="table">The table into which to set the timestamp.</param>
+        internal static void SetCreationTimestamp(CloudTable table)
+        {
+            var entity = new DynamicTableEntity(TableCreationTimestamp, TableCreationTimestamp);
+            entity.Properties.Add(TableCreationTimestamp, new EntityProperty(DateTimeOffset.Now.UtcTicks));
+            var insertOperation = TableOperation.Insert(entity);
+            table.Execute(insertOperation);
+        }
+
+        /// <summary>
+        /// Get the creation timestamp.
+        /// </summary>
+        /// <param name="table">The table for which to get the timestamp.</param>
+        /// <returns>The creation timestamp for the table.</returns>
+        internal static long GetCreationTimestamp(CloudTable table)
+        {
+            var retrieveOperation = TableOperation.Retrieve<DynamicTableEntity>(TableCreationTimestamp, TableCreationTimestamp, new List<string> { TableCreationTimestamp });
+            TableResult result = table.Execute(retrieveOperation);
+            return ((DynamicTableEntity)result.Result).Properties[TableCreationTimestamp].Int64Value!.Value;
         }
     }
 }

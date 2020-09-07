@@ -55,7 +55,7 @@ namespace Corvus.EventStore.Example
 
             IConfigurationRoot config = builder.Build();
 
-            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), config.GetConnectionString("TableStorageConnectionStringAllStream"), true, true).ConfigureAwait(false);
+            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), config.GetConnectionString("TableStorageConnectionStringAllStream"), false, false, true).ConfigureAwait(false);
 
             Console.ReadKey();
         }
@@ -78,7 +78,8 @@ namespace Corvus.EventStore.Example
             string partitionKey = aggregateIdAsString;
 
             var eventFeedCancellationTokenSource = new CancellationTokenSource();
-            Task eventFeedTask = StartEventFeed(inMemoryEventStore, eventFeedCancellationTokenSource.Token);
+            var inMemoryEventFeed = new InMemoryEventFeed(inMemoryEventStore);
+            Task eventFeedTask = StartEventFeed(inMemoryEventFeed, eventFeedCancellationTokenSource.Token);
 
             // Create an aggregate reader for the configured store. This is cheap and can be done every time. It is stateless.
             // You would typically get this as a transient from the container. But as you can see you can just new everything up, too.
@@ -361,7 +362,7 @@ namespace Corvus.EventStore.Example
             }
         }
 
-        private static async Task RunWithMultiPartitionTableStorageInAzureAsync(string connectionString, string allStreamConnectionString, bool writeMore = true, bool startEventMerger = true)
+        private static async Task RunWithMultiPartitionTableStorageInAzureAsync(string connectionString, string allStreamConnectionString, bool writeMore = true, bool startEventMerger = true, bool startEventFeed = true)
         {
             // Configure the database (in this case our cloud table factories)
             // This would typically be done while you are setting up the container
@@ -383,10 +384,19 @@ namespace Corvus.EventStore.Example
 
             // Now were done, start the merger, just to see whether that works.
             TableStorageEventMerger<PartitionedEventCloudTableFactory<EventCloudTableFactory>, AllStreamCloudTableFactory>? eventMerger = null;
+            var cts = new CancellationTokenSource();
+            IEventFeed? eventFeed = null;
+            Task? eventFeedTask = null;
 
             if (startEventMerger)
             {
                 eventMerger = TableStorageEventMerger.From(eventTableFactory, allStreamTableFactory);
+            }
+
+            if (startEventFeed)
+            {
+                eventFeed = TableStorageEventFeed.GetFeedFor(allStreamTableFactory);
+                eventFeedTask = StartEventFeed(eventFeed, cts.Token);
             }
 
             try
@@ -515,6 +525,19 @@ namespace Corvus.EventStore.Example
                         Console.WriteLine(ex);
                     }
                 }
+
+                if (eventFeed != null)
+                {
+                    try
+                    {
+                        cts.Cancel();
+                        await eventFeedTask!.ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // The task cancelled exception.
+                    }
+                }
             }
         }
 
@@ -558,7 +581,8 @@ namespace Corvus.EventStore.Example
             const int batchSize = 10000;
             const int iterationCount = 2;
 
-            Task eventFeedTask = StartEventFeed(inMemoryEventStore, eventFeedCancellationTokenSource.Token, false, aggregateCount * iterationCount);
+            var inMemoryEventFeed = new InMemoryEventFeed(inMemoryEventStore);
+            Task eventFeedTask = StartEventFeed(inMemoryEventFeed, eventFeedCancellationTokenSource.Token, false, aggregateCount * iterationCount);
 
             var sw1 = Stopwatch.StartNew();
             for (int i = 0; i < iterationCount; ++i)
@@ -603,21 +627,18 @@ namespace Corvus.EventStore.Example
             Console.WriteLine($"The event feed caught up and stopped after a further {swOuter.ElapsedMilliseconds / 1000.0} seconds.");
         }
 
-        private static Task StartEventFeed(InMemoryEventStore inMemoryEventStore, CancellationToken token, bool writeEvents = true, int targetCommitCount = int.MaxValue)
+        private static Task StartEventFeed(IEventFeed eventFeed, CancellationToken token, bool writeEvents = true, int targetCommitCount = int.MaxValue)
         {
             return Task.Factory.StartNew(
                 async () =>
                 {
                     int commitCount = 0;
                     int eventCount = 0;
-                    InMemoryEventFeed? eventFeed = null;
                     var sw = Stopwatch.StartNew();
                     try
                     {
-                        eventFeed = new InMemoryEventFeed(inMemoryEventStore);
-
-                        // Get the events 1000 sat a time without a filter
-                        EventFeedResult result = await eventFeed.Get(default, 10000).ConfigureAwait(false);
+                        // Get the events 1000 commits at a time without a filter
+                        EventFeedResult result = await eventFeed.Get(default, 1000).ConfigureAwait(false);
 
                         while (commitCount < targetCommitCount)
                         {
@@ -631,11 +652,11 @@ namespace Corvus.EventStore.Example
                                     foreach (SerializedEvent @event in commit.Events)
                                     {
                                         eventCount += 1;
-                                        if (writeEvents)
+                                        if (writeEvents && eventCount % 1000 == 0)
                                         {
                                             //// Process the result
                                             Console.ForegroundColor = ConsoleColor.Cyan;
-                                            Console.WriteLine($"Seen event {@event.EventType}");
+                                            Console.WriteLine($"Seen {eventCount} events; the last one was {@event.EventType}");
                                             Console.ResetColor();
                                         }
                                     }

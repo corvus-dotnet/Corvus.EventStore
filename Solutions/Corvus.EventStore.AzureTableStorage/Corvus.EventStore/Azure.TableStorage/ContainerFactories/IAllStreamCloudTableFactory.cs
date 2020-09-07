@@ -17,5 +17,11 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
         /// </summary>
         /// <returns>The cloud table for that partition and aggregate.</returns>
         CloudTable GetTable();
+
+        /// <summary>
+        /// Gets the UTC timestamp at which the table was created.
+        /// </summary>
+        /// <returns>The time at which this table was created.</returns>
+        long GetCreationTimestamp();
     }
 }
