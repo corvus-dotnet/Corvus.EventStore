@@ -8,11 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Endjin.RecommendedPractices" Version="1.0.0">
+    <PackageReference Include="Endjin.RecommendedPractices" Version="1.2.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="3.1.7" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="3.1.8" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,6 +20,7 @@
     <ProjectReference Include="..\Corvus.EventStore.Aggregates\Corvus.EventStore.Aggregates.csproj" />
     <ProjectReference Include="..\Corvus.EventStore.AzureTableStorage\Corvus.EventStore.AzureTableStorage.csproj" />
     <ProjectReference Include="..\Corvus.EventStore.InMemory\Corvus.EventStore.InMemory.csproj" />
+    <ProjectReference Include="..\Corvus.EventStore.Rx\Corvus.EventStore.Rx.csproj" />
     <ProjectReference Include="..\Corvus.EventStore.Serialization.Text.Json\Corvus.EventStore.Serialization.Text.Json.csproj" />
   </ItemGroup>
 

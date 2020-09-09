@@ -7,15 +7,14 @@ namespace Corvus.EventStore.Azure.TableStorage.ContainerFactories
     using Microsoft.Azure.Cosmos.Table;
 
     /// <summary>
-    /// A container factory to provide the <see cref="CloudTable"/> for a particular
-    /// aggregate.
+    /// A container factory to provide the <see cref="CloudTable"/> for the all stream.
     /// </summary>
     public interface IAllStreamCloudTableFactory
     {
         /// <summary>
-        /// Gets an instance of the cloud table for the given aggregate ID and logical partition Key.
+        /// Gets an instance of the cloud table for the all stream.
         /// </summary>
-        /// <returns>The cloud table for that partition and aggregate.</returns>
+        /// <returns>The cloud table for the all stream.</returns>
         CloudTable GetTable();
 
         /// <summary>

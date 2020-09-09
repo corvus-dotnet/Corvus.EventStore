@@ -8,7 +8,6 @@ namespace Corvus.EventStore.Example
     using System.Collections.Generic;
     using System.Diagnostics;
     using System.Linq;
-    using System.Threading;
     using System.Threading.Tasks;
     using Corvus.EventStore.Aggregates;
     using Corvus.EventStore.Azure.TableStorage.Aggregates;
@@ -22,7 +21,6 @@ namespace Corvus.EventStore.Example
     using Corvus.EventStore.InMemory.Snapshots;
     using Corvus.EventStore.InMemory.Snapshots.Internal;
     using Corvus.Extensions;
-    using Corvus.SnapshotStore.Azure.TableStorage.ContainerFactories;
     using Microsoft.Extensions.Configuration;
 
     /// <summary>
@@ -55,7 +53,7 @@ namespace Corvus.EventStore.Example
 
             IConfigurationRoot config = builder.Build();
 
-            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), config.GetConnectionString("TableStorageConnectionStringAllStream"), false, false, true).ConfigureAwait(false);
+            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), config.GetConnectionString("TableStorageConnectionStringAllStream"), true, true, true).ConfigureAwait(false);
 
             Console.ReadKey();
         }
@@ -77,9 +75,9 @@ namespace Corvus.EventStore.Example
             // Using the Id as the partition key.
             string partitionKey = aggregateIdAsString;
 
-            var eventFeedCancellationTokenSource = new CancellationTokenSource();
             var inMemoryEventFeed = new InMemoryEventFeed(inMemoryEventStore);
-            Task eventFeedTask = StartEventFeed(inMemoryEventFeed, eventFeedCancellationTokenSource.Token);
+            EventFeedObservable eventFeedObservable = inMemoryEventFeed.AsObservable(default);
+            IDisposable eventFeedSubscription = eventFeedObservable.Subscribe(HandleCommit);
 
             // Create an aggregate reader for the configured store. This is cheap and can be done every time. It is stateless.
             // You would typically get this as a transient from the container. But as you can see you can just new everything up, too.
@@ -158,15 +156,8 @@ namespace Corvus.EventStore.Example
 
             Console.ReadKey();
 
-            try
-            {
-                eventFeedCancellationTokenSource.Cancel();
-                await eventFeedTask.ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // The task cancelled exception.
-            }
+            eventFeedSubscription.Dispose();
+            await eventFeedObservable.DisposeAsync().ConfigureAwait(false);
         }
 
         private static async Task RunWithTableStorageAsync()
@@ -384,9 +375,9 @@ namespace Corvus.EventStore.Example
 
             // Now were done, start the merger, just to see whether that works.
             TableStorageEventMerger<PartitionedEventCloudTableFactory<EventCloudTableFactory>, AllStreamCloudTableFactory>? eventMerger = null;
-            var cts = new CancellationTokenSource();
             IEventFeed? eventFeed = null;
-            Task? eventFeedTask = null;
+            EventFeedObservable? eventFeedObservable = null;
+            IDisposable? eventFeedSubcription = null;
 
             if (startEventMerger)
             {
@@ -396,7 +387,8 @@ namespace Corvus.EventStore.Example
             if (startEventFeed)
             {
                 eventFeed = TableStorageEventFeed.GetFeedFor(allStreamTableFactory);
-                eventFeedTask = StartEventFeed(eventFeed, cts.Token);
+                eventFeedObservable = eventFeed.AsObservable(default);
+                eventFeedSubcription = eventFeedObservable.Subscribe(HandleCommit);
             }
 
             try
@@ -526,12 +518,12 @@ namespace Corvus.EventStore.Example
                     }
                 }
 
-                if (eventFeed != null)
+                if (eventFeedObservable != null)
                 {
                     try
                     {
-                        cts.Cancel();
-                        await eventFeedTask!.ConfigureAwait(false);
+                        eventFeedSubcription?.Dispose();
+                        await eventFeedObservable.DisposeAsync().ConfigureAwait(false);
                     }
                     catch (OperationCanceledException)
                     {
@@ -576,13 +568,13 @@ namespace Corvus.EventStore.Example
 
             Console.WriteLine();
 
-            var eventFeedCancellationTokenSource = new CancellationTokenSource();
-
             const int batchSize = 10000;
             const int iterationCount = 2;
 
             var inMemoryEventFeed = new InMemoryEventFeed(inMemoryEventStore);
-            Task eventFeedTask = StartEventFeed(inMemoryEventFeed, eventFeedCancellationTokenSource.Token, false, aggregateCount * iterationCount);
+
+            EventFeedObservable eventFeedObservable = inMemoryEventFeed.AsObservable(default);
+            IDisposable eventFeedSubscription = eventFeedObservable.Subscribe(HandleCommit);
 
             var sw1 = Stopwatch.StartNew();
             for (int i = 0; i < iterationCount; ++i)
@@ -619,76 +611,17 @@ namespace Corvus.EventStore.Example
 
             var swOuter = Stopwatch.StartNew();
 
-            await eventFeedTask.ConfigureAwait(false);
+            eventFeedSubscription.Dispose();
+            await eventFeedObservable.DisposeAsync().ConfigureAwait(false);
 
             swOuter.Stop();
-
-            Console.WriteLine($"Wrote the events in {sw1.ElapsedMilliseconds / 1000.0} seconds.");
-            Console.WriteLine($"The event feed caught up and stopped after a further {swOuter.ElapsedMilliseconds / 1000.0} seconds.");
         }
 
-        private static Task StartEventFeed(IEventFeed eventFeed, CancellationToken token, bool writeEvents = true, int targetCommitCount = int.MaxValue)
+        private static void HandleCommit(Commit commit)
         {
-            return Task.Factory.StartNew(
-                async () =>
-                {
-                    int commitCount = 0;
-                    int eventCount = 0;
-                    var sw = Stopwatch.StartNew();
-                    try
-                    {
-                        // Get the events 1000 commits at a time without a filter
-                        EventFeedResult result = await eventFeed.Get(default, 1000).ConfigureAwait(false);
-
-                        while (commitCount < targetCommitCount)
-                        {
-                            try
-                            {
-                                int currentCommitCount = commitCount;
-
-                                foreach (Commit @commit in result.Commits)
-                                {
-                                    commitCount += 1;
-                                    foreach (SerializedEvent @event in commit.Events)
-                                    {
-                                        eventCount += 1;
-                                        if (writeEvents && eventCount % 1000 == 0)
-                                        {
-                                            //// Process the result
-                                            Console.ForegroundColor = ConsoleColor.Cyan;
-                                            Console.WriteLine($"Seen {eventCount} events; the last one was {@event.EventType}");
-                                            Console.ResetColor();
-                                        }
-                                    }
-                                }
-
-                                if (currentCommitCount != commitCount)
-                                {
-                                    Console.WriteLine($"Commits: {commitCount}");
-                                }
-
-                                token.ThrowIfCancellationRequested();
-
-                                result = await eventFeed.Get(result.Checkpoint).ConfigureAwait(false);
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine(ex);
-                                throw;
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        sw.Stop();
-                        Console.WriteLine($"Seen {eventCount:N0} events in {commitCount:N0} commits in {sw.ElapsedMilliseconds / 1000.0} seconds");
-
-                        if (eventFeed != null)
-                        {
-                            await eventFeed.DisposeAsync().ConfigureAwait(false);
-                        }
-                    }
-                });
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine($"Seen commit ({commit.AggregateId}, {commit.SequenceNumber})");
+            Console.ResetColor();
         }
     }
 }

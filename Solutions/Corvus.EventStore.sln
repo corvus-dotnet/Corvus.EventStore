@@ -9,11 +9,13 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.Example",
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.InMemory", "Corvus.EventStore.InMemory\Corvus.EventStore.InMemory.csproj", "{5B20C110-7E3F-486D-BA27-6109A09FFD55}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore.Serialization.Text.Json", "Corvus.EventStore.Serialization.Text.Json\Corvus.EventStore.Serialization.Text.Json.csproj", "{CA9FFA50-9837-4E3A-B283-BC095EC7AAC8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.Serialization.Text.Json", "Corvus.EventStore.Serialization.Text.Json\Corvus.EventStore.Serialization.Text.Json.csproj", "{CA9FFA50-9837-4E3A-B283-BC095EC7AAC8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore.Aggregates", "Corvus.EventStore.Aggregates\Corvus.EventStore.Aggregates.csproj", "{D0CC6874-3EA7-4709-B716-4ABE10D89B22}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.Aggregates", "Corvus.EventStore.Aggregates\Corvus.EventStore.Aggregates.csproj", "{D0CC6874-3EA7-4709-B716-4ABE10D89B22}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore.AzureTableStorage", "Corvus.EventStore.AzureTableStorage\Corvus.EventStore.AzureTableStorage.csproj", "{154C87B7-1481-4B83-9814-B7CC1759FD06}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.AzureTableStorage", "Corvus.EventStore.AzureTableStorage\Corvus.EventStore.AzureTableStorage.csproj", "{154C87B7-1481-4B83-9814-B7CC1759FD06}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore.Rx", "Corvus.EventStore.Rx\Corvus.EventStore.Rx.csproj", "{8EC70BE2-E42F-4BD7-9D25-24D309A06B68}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,6 +47,10 @@ Global
 		{154C87B7-1481-4B83-9814-B7CC1759FD06}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{154C87B7-1481-4B83-9814-B7CC1759FD06}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{154C87B7-1481-4B83-9814-B7CC1759FD06}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8EC70BE2-E42F-4BD7-9D25-24D309A06B68}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8EC70BE2-E42F-4BD7-9D25-24D309A06B68}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8EC70BE2-E42F-4BD7-9D25-24D309A06B68}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8EC70BE2-E42F-4BD7-9D25-24D309A06B68}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
