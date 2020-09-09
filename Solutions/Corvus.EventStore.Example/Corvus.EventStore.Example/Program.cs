@@ -53,7 +53,7 @@ namespace Corvus.EventStore.Example
 
             IConfigurationRoot config = builder.Build();
 
-            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), config.GetConnectionString("TableStorageConnectionStringAllStream"), true, true, true).ConfigureAwait(false);
+            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), config.GetConnectionString("TableStorageConnectionStringAllStream") true, true, true).ConfigureAwait(false);
 
             Console.ReadKey();
         }
@@ -76,7 +76,7 @@ namespace Corvus.EventStore.Example
             string partitionKey = aggregateIdAsString;
 
             var inMemoryEventFeed = new InMemoryEventFeed(inMemoryEventStore);
-            EventFeedObservable eventFeedObservable = inMemoryEventFeed.AsObservable(default);
+            EventFeedObservable eventFeedObservable = inMemoryEventFeed.AsObservable();
             IDisposable eventFeedSubscription = eventFeedObservable.Subscribe(HandleCommit);
 
             // Create an aggregate reader for the configured store. This is cheap and can be done every time. It is stateless.
@@ -387,7 +387,7 @@ namespace Corvus.EventStore.Example
             if (startEventFeed)
             {
                 eventFeed = TableStorageEventFeed.GetFeedFor(allStreamTableFactory);
-                eventFeedObservable = eventFeed.AsObservable(default);
+                eventFeedObservable = eventFeed.AsObservable();
                 eventFeedSubcription = eventFeedObservable.Subscribe(HandleCommit);
             }
 
@@ -573,7 +573,7 @@ namespace Corvus.EventStore.Example
 
             var inMemoryEventFeed = new InMemoryEventFeed(inMemoryEventStore);
 
-            EventFeedObservable eventFeedObservable = inMemoryEventFeed.AsObservable(default);
+            EventFeedObservable eventFeedObservable = inMemoryEventFeed.AsObservable();
             IDisposable eventFeedSubscription = eventFeedObservable.Subscribe(HandleCommit);
 
             var sw1 = Stopwatch.StartNew();

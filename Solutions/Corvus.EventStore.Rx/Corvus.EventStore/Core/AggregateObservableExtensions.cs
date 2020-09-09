@@ -20,6 +20,25 @@ namespace Corvus.EventStore.Core
         /// </summary>
         /// <typeparam name="TEventFeed">The type of the <see cref="IAggregateReader"/>.</typeparam>
         /// <param name="feed">The <see cref="IEventFeed"/>.</param>
+        /// <param name="maxItems">The maximum number of items to return in a batch.</param>
+        /// <param name="rateLimit">The (optional) rate limit.</param>
+        /// <returns>The <see cref="IObservable{T}"/> of <see cref="SerializedEvent"/>s.</returns>
+        /// <remarks>Note that this observable will always start from the beginning of the feed, and has no means of restarting
+        /// from a particular checkpoint. This will typically be used in in-memory implementations that do not offer recoverability.</remarks>
+        public static EventFeedObservable AsObservable<TEventFeed>(
+            this TEventFeed feed,
+            int maxItems = 1000,
+            TimeSpan? rateLimit = null)
+            where TEventFeed : IEventFeed
+        {
+            return feed.AsObservable(CheckpointStore.Default, Guid.NewGuid(), default, maxItems, rateLimit);
+        }
+
+        /// <summary>
+        /// Creates an observable from an aggregate reader.
+        /// </summary>
+        /// <typeparam name="TEventFeed">The type of the <see cref="IAggregateReader"/>.</typeparam>
+        /// <param name="feed">The <see cref="IEventFeed"/>.</param>
         /// <param name="filter">The filter to use.</param>
         /// <param name="maxItems">The maximum number of items to return in a batch.</param>
         /// <param name="rateLimit">The (optional) rate limit.</param>
