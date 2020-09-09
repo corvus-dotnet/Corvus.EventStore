@@ -53,7 +53,7 @@ namespace Corvus.EventStore.Example
 
             IConfigurationRoot config = builder.Build();
 
-            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), config.GetConnectionString("TableStorageConnectionStringAllStream") true, true, true).ConfigureAwait(false);
+            await RunWithMultiPartitionTableStorageInAzureAsync(config.GetConnectionString("TableStorageConnectionString"), config.GetConnectionString("TableStorageConnectionStringAllStream"), true, true, true).ConfigureAwait(false);
 
             Console.ReadKey();
         }
