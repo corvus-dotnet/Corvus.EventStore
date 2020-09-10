@@ -4,7 +4,7 @@
 
 namespace Corvus.EventStore.Azure.Cosmos.ContainerFactories
 {
-    using global::Azure.Cosmos;
+    using Microsoft.Azure.Cosmos;
 
     /// <summary>
     /// Provide an <see cref="ISnapshotContainerFactory"/> for development storage.
@@ -12,7 +12,7 @@ namespace Corvus.EventStore.Azure.Cosmos.ContainerFactories
     public readonly struct DevelopmentSnapshotContainerFactory : ISnapshotContainerFactory
     {
         private readonly CosmosClient client;
-        private readonly CosmosContainer container;
+        private readonly Container container;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DevelopmentSnapshotContainerFactory"/> struct.
@@ -38,12 +38,12 @@ namespace Corvus.EventStore.Azure.Cosmos.ContainerFactories
         public string ContainerName { get; }
 
         /// <inheritdoc/>
-        public CosmosContainer GetContainer()
+        public Container GetContainer()
         {
             return this.container;
         }
 
-        private static CosmosContainer GetContainerReference(CosmosClient client, string databaseName, string containerName)
+        private static Container GetContainerReference(CosmosClient client, string databaseName, string containerName)
         {
             return client.GetDatabase(databaseName).GetContainer(containerName);
         }

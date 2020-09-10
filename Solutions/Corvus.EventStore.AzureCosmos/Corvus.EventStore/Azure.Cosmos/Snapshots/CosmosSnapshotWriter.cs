@@ -10,7 +10,7 @@ namespace Corvus.EventStore.Azure.Cosmos.Snapshots
     using Corvus.EventStore.Azure.Cosmos.Snapshots.Internal;
     using Corvus.EventStore.Core;
     using Corvus.EventStore.Snapshots;
-    using global::Azure.Cosmos;
+    using Microsoft.Azure.Cosmos;
 
     /// <summary>
     /// In-memory implementation of <see cref="ISnapshotWriter"/>.
