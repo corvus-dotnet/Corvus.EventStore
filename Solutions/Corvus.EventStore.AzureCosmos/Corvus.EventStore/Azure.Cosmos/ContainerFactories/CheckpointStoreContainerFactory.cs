@@ -24,7 +24,6 @@ namespace Corvus.EventStore.Azure.Cosmos.ContainerFactories
         {
             this.DatabaseName = databaseName;
             this.ContainerName = containerName;
-            var clientOptions = new CosmosClientOptions();
             this.client = new CosmosClient(connectionString);
             this.container = GetContainerReference(this.client, this.DatabaseName, this.ContainerName);
         }

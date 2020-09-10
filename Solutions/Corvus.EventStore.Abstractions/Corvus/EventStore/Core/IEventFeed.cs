@@ -11,7 +11,7 @@ namespace Corvus.EventStore.Core
     /// Implemented by types which provide a checkpointed
     /// feed of events from the Event Store.
     /// </summary>
-    public interface IEventFeed : IAsyncDisposable
+    public interface IEventFeed
     {
         /// <summary>
         /// Get the filtered events from the event feed with a filter.

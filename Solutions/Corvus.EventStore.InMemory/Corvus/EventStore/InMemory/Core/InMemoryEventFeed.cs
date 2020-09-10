@@ -23,13 +23,6 @@ namespace Corvus.EventStore.InMemory.Core
         public InMemoryEventFeed(InMemoryEventStore store)
         {
             this.store = store;
-            this.store.StartAllStreamBuilder();
-        }
-
-        /// <inheritdoc/>
-        public ValueTask DisposeAsync()
-        {
-            return new ValueTask(this.store.StopAllStreamBuilderAsync());
         }
 
         /// <inheritdoc/>

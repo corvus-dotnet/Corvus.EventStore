@@ -33,12 +33,6 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
         }
 
         /// <inheritdoc/>
-        public ValueTask DisposeAsync()
-        {
-            return new ValueTask(Task.CompletedTask);
-        }
-
-        /// <inheritdoc/>
         public ValueTask<EventFeedResult> Get(EventFeedFilter filter, int maxItems)
         {
             return this.Get(filter.AggregateIds, filter.PartitionKeys, maxItems, TableStorageEventMerger.GetPartitionForTimestamp(this.factory.GetCreationTimestamp()), 0L, null);

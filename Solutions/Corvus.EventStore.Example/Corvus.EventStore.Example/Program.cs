@@ -87,6 +87,7 @@ namespace Corvus.EventStore.Example
             // Using the Id as the partition key.
             string partitionKey = aggregateIdAsString;
 
+            inMemoryEventStore.StartAllStreamBuilder();
             var inMemoryEventFeed = new InMemoryEventFeed(inMemoryEventStore);
             EventFeedObservable eventFeedObservable = inMemoryEventFeed.AsObservable();
             IDisposable eventFeedSubscription = eventFeedObservable.Subscribe(HandleCommit);
@@ -168,6 +169,7 @@ namespace Corvus.EventStore.Example
 
             Console.ReadKey();
 
+            await inMemoryEventStore.StopAllStreamBuilderAsync().ConfigureAwait(false);
             eventFeedSubscription.Dispose();
             await eventFeedObservable.DisposeAsync().ConfigureAwait(false);
         }
@@ -676,6 +678,7 @@ namespace Corvus.EventStore.Example
             const int batchSize = 10000;
             const int iterationCount = 2;
 
+            inMemoryEventStore.StartAllStreamBuilder();
             var inMemoryEventFeed = new InMemoryEventFeed(inMemoryEventStore);
 
             EventFeedObservable eventFeedObservable = inMemoryEventFeed.AsObservable();
@@ -716,6 +719,7 @@ namespace Corvus.EventStore.Example
 
             var swOuter = Stopwatch.StartNew();
 
+            await inMemoryEventStore.StopAllStreamBuilderAsync().ConfigureAwait(false);
             eventFeedSubscription.Dispose();
             await eventFeedObservable.DisposeAsync().ConfigureAwait(false);
 
