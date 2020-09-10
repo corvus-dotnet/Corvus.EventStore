@@ -32,6 +32,8 @@ namespace Corvus.EventStore.Example
     /// </summary>
     public class Program
     {
+        private static long count = 0;
+
         /// <summary>
         /// Main entry point.
         /// </summary>
@@ -65,7 +67,8 @@ namespace Corvus.EventStore.Example
 
             IConfigurationRoot config = builder.Build();
 
-            await RunWithCosmosAsync(config.GetConnectionString("CosmosConnectionString")).ConfigureAwait(false);
+            ////await RunWithCosmosAsync(config.GetConnectionString("CosmosConnectionString")).ConfigureAwait(false);
+            await RunWithHighLoadCosmosInAzureAsync(config.GetConnectionString("CosmosConnectionString"), true, false).ConfigureAwait(false);
 
             Console.ReadKey();
         }
@@ -647,6 +650,168 @@ namespace Corvus.EventStore.Example
             }
         }
 
+        private static async Task RunWithHighLoadCosmosInAzureAsync(string connectionString, bool writeMore = true, bool startEventFeed = true)
+        {
+            // Configure the database (in this case our cloud table factories)
+            // This would typically be done while you are setting up the container
+            var eventContainerFactory = new EventContainerFactory(connectionString, "corvuseventstore", "corvusevents");
+            var snapshotContainerFactory = new SnapshotContainerFactory(connectionString, "corvuseventstore", "corvussnapshots");
+
+            // Now were done, start the merger, just to see whether that works.
+            TableStorageEventMerger<PartitionedEventCloudTableFactory<EventCloudTableFactory>, AllStreamCloudTableFactory>? eventMerger = null;
+            IEventFeed? eventFeed = null;
+            EventFeedObservable? eventFeedObservable = null;
+            IDisposable? eventFeedSubcription = null;
+
+            if (startEventFeed)
+            {
+                eventFeed = new CosmosEventFeed(eventContainerFactory);
+                eventFeedObservable = eventFeed.AsObservable();
+                eventFeedSubcription = eventFeedObservable.Subscribe(HandleCommit, HandleError);
+            }
+
+            try
+            {
+                if (writeMore)
+                {
+                    // Example 1: Retrieve a new instance of an aggregate from the store. This type of aggregate is implemented over its own in-memory memento.
+                    // We Do things to it and commit it.
+
+                    // Create an aggregate reader for the configured store. This is cheap and can be done every time. It is stateless.
+                    // You would typically get this as a transient from the container. But as you can see you can just new everything up, too.
+                    // This happens to use an in memory reader for both the events and the snapshots, but you could (and frequently would) configure the AggregateReader with
+                    // different readers for events and snapshots so that they can go to different stores.
+                    AggregateReader<CosmosEventReader, CosmosSnapshotReader> reader =
+                        CosmosAggregateReader.GetInstance(eventContainerFactory, snapshotContainerFactory);
+
+                    // Create an aggregate writer for the configured store. This is cheap and can be done every time. It is stateless.
+                    AggregateWriter<CosmosEventWriter, CosmosSnapshotWriter> writer =
+                        CosmosAggregateWriter.GetInstance(eventContainerFactory, snapshotContainerFactory);
+
+                    // This is the ID of our aggregate - imagine this came in from the request, for example.
+                    Guid[] aggregateIds = Enumerable.Range(0, 625)
+                        .Select(i => Guid.NewGuid())
+                        .ToArray();
+
+                    const int batchSize = 625;
+                    const int initializationBatchSize = 625;
+                    const int iterations = 50;
+                    const int nodesPerAggregate = 8;
+                    const int maxRatePerNode = 1000;
+                    const int eventsPerCommit = 8;
+
+                    var aggregates = new ToDoList[aggregateIds.Length];
+
+                    Console.WriteLine("Initializing aggregates.");
+
+                    var initTaskList = new Task<ToDoList>[initializationBatchSize];
+
+                    var loadSw = Stopwatch.StartNew();
+                    for (int i = 0; i < (int)Math.Ceiling((double)aggregateIds.Length / initializationBatchSize); ++i)
+                    {
+                        for (int index = 0; index < initializationBatchSize; ++index)
+                        {
+                            Guid id = aggregateIds[(initializationBatchSize * i) + index];
+                            initTaskList[index] = ToDoList.ReadAsync(reader, id, id.ToString()).AsTask();
+                        }
+
+                        ToDoList[] results = await Task.WhenAll(initTaskList).ConfigureAwait(false);
+                        results.CopyTo(aggregates, initializationBatchSize * i);
+                    }
+
+                    loadSw.Stop();
+
+                    Console.WriteLine($"Loaded {aggregateIds.Length} aggregates in {loadSw.ElapsedMilliseconds / 1000.0} seconds ({aggregateIds.Length / (loadSw.ElapsedMilliseconds / 1000.0)} agg/sec)");
+
+                    Console.WriteLine();
+
+                    var executeSw = Stopwatch.StartNew();
+
+                    var taskList = new Task<ToDoList>[batchSize];
+
+                    for (int i = 0; i < iterations; ++i)
+                    {
+                        DateTimeOffset startTime = DateTimeOffset.Now;
+
+                        Console.WriteLine($"Iteration {i}");
+                        for (int batch = 0; batch < aggregateIds.Length / batchSize; ++batch)
+                        {
+                            Console.WriteLine($"Batch {batch}");
+
+                            var sw = Stopwatch.StartNew();
+
+                            for (int node = 0; node < nodesPerAggregate; ++node)
+                            {
+                                for (int taskCount = 0; taskCount < batchSize; ++taskCount)
+                                {
+                                    ToDoList toDoList = aggregates[(batch * batchSize) + taskCount];
+                                    for (int eventCount = 0; eventCount < eventsPerCommit; ++eventCount)
+                                    {
+                                        toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
+                                    }
+
+                                    ValueTask<ToDoList> task = toDoList.CommitAsync(writer);
+                                    taskList[taskCount] = task.AsTask();
+                                }
+
+                                ToDoList[] batchAggregates = await Task.WhenAll(taskList).ConfigureAwait(false);
+                                batchAggregates.CopyTo(aggregates, batch * batchSize);
+                            }
+
+                            sw.Stop();
+
+                            Console.WriteLine($"{aggregateIds.Length * nodesPerAggregate} commits in {sw.ElapsedMilliseconds}, ({(aggregateIds.Length * nodesPerAggregate) / (sw.ElapsedMilliseconds / 1000.0)} commits/s)");
+                            Console.WriteLine($"{(aggregateIds.Length * nodesPerAggregate * eventsPerCommit) / (sw.ElapsedMilliseconds / 1000.0)} events/s");
+                        }
+
+                        double elapsed = (DateTimeOffset.Now - startTime).TotalMilliseconds;
+
+                        // Rate limit to ~1 per second per node
+                        if (elapsed < maxRatePerNode)
+                        {
+                            int delay = maxRatePerNode - (int)elapsed;
+                            Console.WriteLine($"Delaying {delay}ms");
+
+                            await Task.Delay(delay).ConfigureAwait(false);
+                        }
+                    }
+
+                    executeSw.Stop();
+                    Console.WriteLine($"Executed {aggregateIds.Length * iterations * nodesPerAggregate} atomic commits in {executeSw.ElapsedMilliseconds / 1000.0} seconds ({aggregateIds.Length * iterations * nodesPerAggregate / (executeSw.ElapsedMilliseconds / 1000.0)} ) commits/sec");
+                    Console.WriteLine($"({aggregateIds.Length * iterations * nodesPerAggregate * eventsPerCommit / (executeSw.ElapsedMilliseconds / 1000.0)} ) events/sec");
+                }
+            }
+            finally
+            {
+                Console.ReadKey();
+
+                if (eventMerger.HasValue)
+                {
+                    try
+                    {
+                        await eventMerger.Value.DisposeAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex);
+                    }
+                }
+
+                if (eventFeedObservable != null)
+                {
+                    try
+                    {
+                        eventFeedSubcription?.Dispose();
+                        await eventFeedObservable.DisposeAsync().ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // The task cancelled exception.
+                    }
+                }
+            }
+        }
+
         private static async Task RunInMemoryMultipleIterationsAsync()
         {
             // Configure the database (in this case a hand-rolled "in memory event store" database. But could be e.g. SQL, Cosmos, Table Storage
@@ -740,9 +905,13 @@ namespace Corvus.EventStore.Example
 
         private static void HandleCommit(Commit commit)
         {
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"Seen commit ({commit.AggregateId}, {commit.SequenceNumber})");
-            Console.ResetColor();
+            count += 1;
+            if (count % 10000 == 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"Seen {count} commits.");
+                Console.ResetColor();
+            }
         }
     }
 }

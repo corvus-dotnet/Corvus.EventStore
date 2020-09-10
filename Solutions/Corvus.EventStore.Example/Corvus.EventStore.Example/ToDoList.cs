@@ -168,7 +168,7 @@ namespace Corvus.EventStore.Example
             return new ToDoList(
                 await writer.CommitAsync(
                     this.aggregate,
-                    snapshotPolicy: AlwaysSnapshotPolicy<AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>>.Instance).ConfigureAwait(false));
+                    snapshotPolicy: NeverSnapshotPolicy<AggregateWithMemento<ToDoListEventHandler, ToDoListMemento>>.Instance).ConfigureAwait(false));
         }
     }
 }
