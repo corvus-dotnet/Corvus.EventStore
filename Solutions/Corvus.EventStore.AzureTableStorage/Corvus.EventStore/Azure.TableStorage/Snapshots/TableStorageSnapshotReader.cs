@@ -29,7 +29,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Snapshots
         }
 
         /// <inheritdoc/>
-        public async ValueTask<SerializedSnapshot> ReadAsync(Guid aggregateId, string partitionKey, long atSequenceId = long.MaxValue)
+        public async ValueTask<SerializedSnapshot> ReadAsync(Guid aggregateId, string partitionKey, long atSequenceNumber = long.MaxValue)
         {
             CloudTable cloudTable = this.cloudTableFactory.GetTable(aggregateId, partitionKey);
             TableQuery? query = new TableQuery().Where(
@@ -37,7 +37,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Snapshots
                     TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, TableHelpers.BuildPK(aggregateId)),
                     TableOperators.And,
                     //// Note that this is GreaterThanOrEqual because our RK is a reversed version of the sequence number to permit for "most recent"
-                    TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, TableHelpers.BuildRK(atSequenceId))));
+                    TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, TableHelpers.BuildRK(atSequenceNumber))));
 
             TableQuerySegment<DynamicTableEntity> result = await cloudTable.ExecuteQuerySegmentedAsync(query, null);
             if (!result.Any())

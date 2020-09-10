@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Corvus.EventStore.Abstractions\Corvus.EventStore.Abstractions.csproj" />
     <ProjectReference Include="..\Corvus.EventStore.Aggregates\Corvus.EventStore.Aggregates.csproj" />
+    <ProjectReference Include="..\Corvus.EventStore.AzureCosmos\Corvus.EventStore.AzureCosmos.csproj" />
     <ProjectReference Include="..\Corvus.EventStore.AzureTableStorage\Corvus.EventStore.AzureTableStorage.csproj" />
     <ProjectReference Include="..\Corvus.EventStore.InMemory\Corvus.EventStore.InMemory.csproj" />
     <ProjectReference Include="..\Corvus.EventStore.Rx\Corvus.EventStore.Rx.csproj" />

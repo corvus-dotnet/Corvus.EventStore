@@ -17,11 +17,11 @@ namespace Corvus.EventStore.Snapshots
         /// </summary>
         /// <param name="aggregateId">The Id of the aggregate to read the snapshot for.</param>
         /// <param name="partitionKey">The partition key of the aggregate.</param>
-        /// <param name="atSequenceId">The sequence Id to read the snapshot at. The snapshot returned will be the one with the highest sequence number less than or equal to this value.</param>
-        /// <returns>The most recent snapshot for the aggregate. If no snapshot exists, a new snapshot will be returned containing a payload created via the defaultPayloadFactory.</returns>
+        /// <param name="atCommitSequenceNumber">The commit sequence nuber at which to read the snapshot. The snapshot returned will be the one with the highest commit sequence number less than or equal to this value.</param>
+        /// <returns>The most recent snapshot for the aggregate. If no snapshot exists, a new snapshot will be returned containing a default payload.</returns>
         ValueTask<SerializedSnapshot> ReadAsync(
             Guid aggregateId,
             string partitionKey,
-            long atSequenceId = long.MaxValue);
+            long atCommitSequenceNumber = long.MaxValue);
     }
 }

@@ -54,7 +54,7 @@ namespace Corvus.EventStore.Azure.TableStorage.Core
             if (result.HttpStatusCode >= 200 && result.HttpStatusCode <= 299)
             {
                 TableResult deletionResult = await this.table.ExecuteAsync(TableOperation.Delete((DynamicTableEntity)result.Result)).ConfigureAwait(false);
-                if (result.HttpStatusCode >= 200 && result.HttpStatusCode <= 299)
+                if (deletionResult.HttpStatusCode >= 200 && result.HttpStatusCode <= 299)
                 {
                     return;
                 }

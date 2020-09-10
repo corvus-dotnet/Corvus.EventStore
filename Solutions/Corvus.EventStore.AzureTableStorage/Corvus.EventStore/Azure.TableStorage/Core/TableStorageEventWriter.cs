@@ -4,7 +4,6 @@
 
 namespace Corvus.EventStore.Azure.TableStorage.Core
 {
-    using System;
     using System.Threading.Tasks;
     using Corvus.EventStore.Azure.TableStorage.ContainerFactories;
     using Corvus.EventStore.Azure.TableStorage.Core.Internal;

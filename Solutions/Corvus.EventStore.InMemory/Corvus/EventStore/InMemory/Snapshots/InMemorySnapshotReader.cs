@@ -26,9 +26,9 @@ namespace Corvus.EventStore.InMemory.Snapshots
         }
 
         /// <inheritdoc/>
-        public ValueTask<SerializedSnapshot> ReadAsync(Guid aggregateId, string partitionKey, long atSequenceId = long.MaxValue)
+        public ValueTask<SerializedSnapshot> ReadAsync(Guid aggregateId, string partitionKey, long atSequenceNumber = long.MaxValue)
         {
-            return this.store.ReadAsync(aggregateId, partitionKey, atSequenceId);
+            return this.store.ReadAsync(aggregateId, partitionKey, atSequenceNumber);
         }
     }
 }

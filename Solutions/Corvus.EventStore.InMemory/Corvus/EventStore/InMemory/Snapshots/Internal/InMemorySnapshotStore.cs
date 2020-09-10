@@ -25,19 +25,19 @@ namespace Corvus.EventStore.InMemory.Snapshots.Internal
         /// </summary>
         /// <param name="aggregateId">The Id of the aggregate.</param>
         /// <param name="partitionKey">The partition key of the aggregate.</param>
-        /// <param name="atSequenceId">The sequence Id to read the snapshot at. The snapshot returned will be the one with the highest sequence number less than or equal to this value.</param>
+        /// <param name="atSequenceNumber">The sequence Id to read the snapshot at. The snapshot returned will be the one with the highest sequence number less than or equal to this value.</param>
         /// <returns>The most recent snapshot for the aggregate. If no snapshot exists, a new snapshot will be returned containing a payload created via the defaultPayloadFactory.</returns>
         public ValueTask<SerializedSnapshot> ReadAsync(
             Guid aggregateId,
             string partitionKey,
-            long atSequenceId = long.MaxValue)
+            long atSequenceNumber = long.MaxValue)
         {
             if (!this.store.TryGetValue(aggregateId, out SnapshotList list))
             {
                 return new ValueTask<SerializedSnapshot>(SerializedSnapshot.Empty(aggregateId, partitionKey));
             }
 
-            KeyValuePair<long, SerializedSnapshot>? snapshot = list.Snapshots.OrderByDescending(s => s.Key).Where(s => s.Key < atSequenceId).FirstOrDefault();
+            KeyValuePair<long, SerializedSnapshot>? snapshot = list.Snapshots.OrderByDescending(s => s.Key).Where(s => s.Key < atSequenceNumber).FirstOrDefault();
 
             if (snapshot is null)
             {
