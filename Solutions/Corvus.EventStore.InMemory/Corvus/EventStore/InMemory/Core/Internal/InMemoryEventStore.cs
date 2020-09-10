@@ -142,7 +142,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         /// <summary>
         /// Starts the all stream builder.
         /// </summary>
-        internal void StartAllStreamBuilder()
+        public void StartAllStreamBuilder()
         {
             if (this.allStreamTask is null)
             {
@@ -204,7 +204,7 @@ namespace Corvus.EventStore.InMemory.Core.Internal
         /// Stop the all stream builder if it was already running.
         /// </summary>
         /// <returns>A <see cref="Task"/> which completes when the all stream builder has stopped.</returns>
-        internal Task StopAllStreamBuilderAsync()
+        public Task StopAllStreamBuilderAsync()
         {
             if (this.allStreamTask is null)
             {

@@ -4,10 +4,10 @@
 
 namespace Corvus.EventStore.Azure.Cosmos.ContainerFactories
 {
-    using Microsoft.Azure.Cosmos;
+    using global::Azure.Cosmos;
 
     /// <summary>
-    /// A container factory to provide the <see cref="Container"/> for the checkpoint store.
+    /// A container factory to provide the <see cref="CosmosContainer"/> for the checkpoint store.
     /// </summary>
     public interface ICheckpointStoreContainerFactory
     {
@@ -15,6 +15,6 @@ namespace Corvus.EventStore.Azure.Cosmos.ContainerFactories
         /// Gets an instance of the cloud container for the checkpoint store.
         /// </summary>
         /// <returns>The cloud container for the all stream.</returns>
-        Container GetContainer();
+        CosmosContainer GetContainer();
     }
 }

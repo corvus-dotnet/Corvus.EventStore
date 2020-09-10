@@ -12,7 +12,7 @@ namespace Corvus.EventStore.Azure.Cosmos.Core
     using Corvus.EventStore.Azure.Cosmos.ContainerFactories;
     using Corvus.EventStore.Azure.Cosmos.Core.Internal;
     using Corvus.EventStore.Core;
-    using Microsoft.Azure.Cosmos;
+    using global::Azure.Cosmos;
 
     /// <summary>
     /// Implements an event reader over Cosmos DBV SQL API.
