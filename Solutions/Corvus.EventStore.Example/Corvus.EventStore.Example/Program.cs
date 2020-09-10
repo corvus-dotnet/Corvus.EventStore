@@ -90,7 +90,7 @@ namespace Corvus.EventStore.Example
             inMemoryEventStore.StartAllStreamBuilder();
             var inMemoryEventFeed = new InMemoryEventFeed(inMemoryEventStore);
             EventFeedObservable eventFeedObservable = inMemoryEventFeed.AsObservable();
-            IDisposable eventFeedSubscription = eventFeedObservable.Subscribe(HandleCommit);
+            IDisposable eventFeedSubscription = eventFeedObservable.Subscribe(HandleCommit, HandleError);
 
             // Create an aggregate reader for the configured store. This is cheap and can be done every time. It is stateless.
             // You would typically get this as a transient from the container. But as you can see you can just new everything up, too.
@@ -274,6 +274,10 @@ namespace Corvus.EventStore.Example
             var eventContainerFactory = new EventContainerFactory(connectionString, "corvuseventstore", "corvusevents");
             var snapshotContainerFactory = new SnapshotContainerFactory(connectionString, "corvuseventstore", "corvussnapshots");
 
+            var cosmosEventFeed = new CosmosEventFeed(eventContainerFactory);
+            EventFeedObservable eventFeedObservable = cosmosEventFeed.AsObservable();
+            IDisposable eventFeedSubscription = eventFeedObservable.Subscribe(HandleCommit, HandleError);
+
             // Example 1: Retrieve a new instance of an aggregate from the store. This type of aggregate is implemented over its own in-memory memento.
             // We Do things to it and commit it.
 
@@ -358,6 +362,9 @@ namespace Corvus.EventStore.Example
             {
                 Console.WriteLine($"Oh dear - {ex.Message}");
             }
+
+            await eventFeedObservable.DisposeAsync().ConfigureAwait(false);
+            eventFeedSubscription.Dispose();
         }
 
         private static async Task RunWithMultiPartitionTableStorageAsync(bool writeMore = true)
@@ -495,7 +502,7 @@ namespace Corvus.EventStore.Example
             {
                 eventFeed = TableStorageEventFeed.GetFeedFor(allStreamTableFactory);
                 eventFeedObservable = eventFeed.AsObservable();
-                eventFeedSubcription = eventFeedObservable.Subscribe(HandleCommit);
+                eventFeedSubcription = eventFeedObservable.Subscribe(HandleCommit, HandleError);
             }
 
             try
@@ -682,7 +689,7 @@ namespace Corvus.EventStore.Example
             var inMemoryEventFeed = new InMemoryEventFeed(inMemoryEventStore);
 
             EventFeedObservable eventFeedObservable = inMemoryEventFeed.AsObservable();
-            IDisposable eventFeedSubscription = eventFeedObservable.Subscribe(HandleCommit);
+            IDisposable eventFeedSubscription = eventFeedObservable.Subscribe(HandleCommit, HandleError);
 
             var sw1 = Stopwatch.StartNew();
             for (int i = 0; i < iterationCount; ++i)
@@ -724,6 +731,11 @@ namespace Corvus.EventStore.Example
             await eventFeedObservable.DisposeAsync().ConfigureAwait(false);
 
             swOuter.Stop();
+        }
+
+        private static void HandleError(Exception ex)
+        {
+            Console.WriteLine(ex);
         }
 
         private static void HandleCommit(Commit commit)
