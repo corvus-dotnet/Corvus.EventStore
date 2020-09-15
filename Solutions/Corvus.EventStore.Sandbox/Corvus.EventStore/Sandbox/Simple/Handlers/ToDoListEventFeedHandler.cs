@@ -29,11 +29,6 @@ namespace Corvus.EventStore.Sandbox.Simple.Handlers
         /// </summary>
         public int TotalCommitCount { get; private set; }
 
-        /// <summary>
-        /// Gets the log.
-        /// </summary>
-        public string Log => this.log.ToString();
-
         /// <inheritdoc/>
         public Task HandleBatchComplete(string checkpoint)
         {
@@ -59,20 +54,16 @@ namespace Corvus.EventStore.Sandbox.Simple.Handlers
             switch (eventType)
             {
                 case ToDoItemAddedEventPayload.EventType:
-                    ToDoItemAddedEventPayload added = payloadReader.Read<ToDoItemAddedEventPayload>();
-                    this.log.AppendLine($"{aggregateId} : {commitSequenceNumber:D21}.{eventSequenceNumber:D21} ToDoItemAdded : {added.Id} {added.Title}");
+                    _ = payloadReader.Read<ToDoItemAddedEventPayload>();
                     break;
                 case ToDoItemRemovedEventPayload.EventType:
-                    ToDoItemRemovedEventPayload removed = payloadReader.Read<ToDoItemRemovedEventPayload>();
-                    this.log.AppendLine($"{aggregateId} : {commitSequenceNumber:D21}.{eventSequenceNumber:D21} ToDoItemRemoved : {removed.Id}");
+                    _ = payloadReader.Read<ToDoItemRemovedEventPayload>();
                     break;
                 case ToDoListOwnerSetEventPayload.EventType:
-                    ToDoListOwnerSetEventPayload owner = payloadReader.Read<ToDoListOwnerSetEventPayload>();
-                    this.log.AppendLine($"{aggregateId} : {commitSequenceNumber:D21}.{eventSequenceNumber:D21} ToDoListOwnerSet : {owner.Owner}");
+                    _ = payloadReader.Read<ToDoListOwnerSetEventPayload>();
                     break;
                 case ToDoListStartDateSetEventPayload.EventType:
-                    ToDoListStartDateSetEventPayload startDate = payloadReader.Read<ToDoListStartDateSetEventPayload>();
-                    this.log.AppendLine($"{aggregateId} : {commitSequenceNumber:D21}.{eventSequenceNumber:D21} ToDoListStartDateSet : {startDate.StartDate}");
+                    _ = payloadReader.Read<ToDoListStartDateSetEventPayload>();
                     break;
                 default:
                     this.log.AppendLine($"The event for aggregate {aggregateId} in commit {commitSequenceNumber} with event sequence number {eventSequenceNumber} had event type {eventType} which was not recognized as a valid event type for the ToDoListAggregate.");
