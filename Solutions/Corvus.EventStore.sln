@@ -1,23 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
-VisualStudioVersion = 16.0.30011.22
+VisualStudioVersion = 16.0.30503.244
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.Abstractions", "Corvus.EventStore.Abstractions\Corvus.EventStore.Abstractions.csproj", "{3034E22D-3432-4121-96BF-2C1A0B75E109}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore", "Corvus.EventStore\Corvus.EventStore.csproj", "{4CE0E1E6-FA5B-427B-AE9A-10E059849D6E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.Example", "Corvus.EventStore.Example\Corvus.EventStore.Example.csproj", "{0AA85FAE-6106-41BF-AE36-147258E10381}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore.AzureCosmos", "Corvus.EventStore.AzureCosmos\Corvus.EventStore.AzureCosmos.csproj", "{7FDE6009-DD05-485A-AB23-95F2EE022602}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.InMemory", "Corvus.EventStore.InMemory\Corvus.EventStore.InMemory.csproj", "{5B20C110-7E3F-486D-BA27-6109A09FFD55}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.Serialization.Text.Json", "Corvus.EventStore.Serialization.Text.Json\Corvus.EventStore.Serialization.Text.Json.csproj", "{CA9FFA50-9837-4E3A-B283-BC095EC7AAC8}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.Aggregates", "Corvus.EventStore.Aggregates\Corvus.EventStore.Aggregates.csproj", "{D0CC6874-3EA7-4709-B716-4ABE10D89B22}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.AzureTableStorage", "Corvus.EventStore.AzureTableStorage\Corvus.EventStore.AzureTableStorage.csproj", "{154C87B7-1481-4B83-9814-B7CC1759FD06}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.Rx", "Corvus.EventStore.Rx\Corvus.EventStore.Rx.csproj", "{8EC70BE2-E42F-4BD7-9D25-24D309A06B68}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.AzureCosmos", "Corvus.EventStore.AzureCosmos\Corvus.EventStore.AzureCosmos.csproj", "{5C35F016-7593-4AF6-A211-5B7C646CE8A2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore.Sandbox", "Corvus.EventStore.Sandbox\Corvus.EventStore.Sandbox.csproj", "{6EC074BC-0FF1-44BD-9AB3-8B8BC8AF699E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -25,43 +15,23 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{3034E22D-3432-4121-96BF-2C1A0B75E109}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3034E22D-3432-4121-96BF-2C1A0B75E109}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3034E22D-3432-4121-96BF-2C1A0B75E109}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3034E22D-3432-4121-96BF-2C1A0B75E109}.Release|Any CPU.Build.0 = Release|Any CPU
-		{0AA85FAE-6106-41BF-AE36-147258E10381}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{0AA85FAE-6106-41BF-AE36-147258E10381}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{0AA85FAE-6106-41BF-AE36-147258E10381}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{0AA85FAE-6106-41BF-AE36-147258E10381}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5B20C110-7E3F-486D-BA27-6109A09FFD55}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5B20C110-7E3F-486D-BA27-6109A09FFD55}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5B20C110-7E3F-486D-BA27-6109A09FFD55}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5B20C110-7E3F-486D-BA27-6109A09FFD55}.Release|Any CPU.Build.0 = Release|Any CPU
-		{CA9FFA50-9837-4E3A-B283-BC095EC7AAC8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{CA9FFA50-9837-4E3A-B283-BC095EC7AAC8}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{CA9FFA50-9837-4E3A-B283-BC095EC7AAC8}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{CA9FFA50-9837-4E3A-B283-BC095EC7AAC8}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D0CC6874-3EA7-4709-B716-4ABE10D89B22}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D0CC6874-3EA7-4709-B716-4ABE10D89B22}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D0CC6874-3EA7-4709-B716-4ABE10D89B22}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D0CC6874-3EA7-4709-B716-4ABE10D89B22}.Release|Any CPU.Build.0 = Release|Any CPU
-		{154C87B7-1481-4B83-9814-B7CC1759FD06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{154C87B7-1481-4B83-9814-B7CC1759FD06}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{154C87B7-1481-4B83-9814-B7CC1759FD06}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{154C87B7-1481-4B83-9814-B7CC1759FD06}.Release|Any CPU.Build.0 = Release|Any CPU
-		{8EC70BE2-E42F-4BD7-9D25-24D309A06B68}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{8EC70BE2-E42F-4BD7-9D25-24D309A06B68}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{8EC70BE2-E42F-4BD7-9D25-24D309A06B68}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{8EC70BE2-E42F-4BD7-9D25-24D309A06B68}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5C35F016-7593-4AF6-A211-5B7C646CE8A2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5C35F016-7593-4AF6-A211-5B7C646CE8A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5C35F016-7593-4AF6-A211-5B7C646CE8A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{5C35F016-7593-4AF6-A211-5B7C646CE8A2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4CE0E1E6-FA5B-427B-AE9A-10E059849D6E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4CE0E1E6-FA5B-427B-AE9A-10E059849D6E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4CE0E1E6-FA5B-427B-AE9A-10E059849D6E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4CE0E1E6-FA5B-427B-AE9A-10E059849D6E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7FDE6009-DD05-485A-AB23-95F2EE022602}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7FDE6009-DD05-485A-AB23-95F2EE022602}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7FDE6009-DD05-485A-AB23-95F2EE022602}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7FDE6009-DD05-485A-AB23-95F2EE022602}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6EC074BC-0FF1-44BD-9AB3-8B8BC8AF699E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6EC074BC-0FF1-44BD-9AB3-8B8BC8AF699E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6EC074BC-0FF1-44BD-9AB3-8B8BC8AF699E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6EC074BC-0FF1-44BD-9AB3-8B8BC8AF699E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {41A4D67E-0078-4879-A2B8-03C19A99C11D}
+		SolutionGuid = {5F412E3A-DF51-4099-A0F8-BF6806C20018}
 	EndGlobalSection
 EndGlobal
