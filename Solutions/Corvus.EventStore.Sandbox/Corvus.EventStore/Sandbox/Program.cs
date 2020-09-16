@@ -10,11 +10,10 @@ namespace Corvus.EventStore.Sandbox
     using System.Threading;
     using System.Threading.Tasks;
     using Corvus.EventStore.AzureCosmos;
+    using Corvus.EventStore.Json;
+    using Corvus.EventStore.Sandbox.Mementos;
     using Corvus.EventStore.Sandbox.Simple.Handlers;
     using Microsoft.Extensions.Configuration;
-
-    using TDL = ToDoList<Json.JsonAggregateRoot<Mementos.ToDoListMemento, AzureCosmos.CosmosJsonStore>>;
-    using TDLJ = ToDoListJson<Json.JsonAggregateRoot<Mementos.ToDoListMementoJson, AzureCosmos.CosmosJsonStore>>;
 
     /// <summary>
     /// Main program.
@@ -45,13 +44,13 @@ namespace Corvus.EventStore.Sandbox
             var toDoListId = Guid.NewGuid();
 
             // Read and modify a todoitem using the simple aggregate.
-            TDL toDoList = await ToDoList.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
+            ToDoList<JsonAggregateRoot<ToDoListMemento, CosmosJsonStore>> toDoList = await ToDoList.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
 
             toDoList = toDoList.Initialize(DateTimeOffset.Now, "Bill Gates");
             toDoList = await toDoList.Commit().ConfigureAwait(false);
 
             // Now load it using the "json-specific" aggregate.
-            TDLJ toDoListJson = await ToDoListJson.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
+            ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>> toDoListJson = await ToDoListJson.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
             toDoListJson = toDoListJson.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
             toDoListJson = toDoListJson.AddToDoItem(Guid.NewGuid(), "This is my second title", "This is my second description");
             toDoListJson = await toDoListJson.Commit().ConfigureAwait(false);
@@ -90,11 +89,11 @@ namespace Corvus.EventStore.Sandbox
             const int minTimePerIteration = 1000;
             const int eventsPerCommit = 8;
 
-            var aggregates = new TDLJ[aggregateIds.Length];
+            var aggregates = new ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>>[aggregateIds.Length];
 
             Console.WriteLine("Initializing aggregates.");
 
-            var initTaskList = new Task<TDLJ>[initializationBatchSize];
+            var initTaskList = new Task<ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>>>[initializationBatchSize];
 
             var loadSw = Stopwatch.StartNew();
             for (int i = 0; i < (int)Math.Ceiling((double)aggregateIds.Length / initializationBatchSize); ++i)
@@ -105,7 +104,7 @@ namespace Corvus.EventStore.Sandbox
                     initTaskList[index] = ToDoListJson.ReadOrCreate(eventStore, id);
                 }
 
-                TDLJ[] results = await Task.WhenAll(initTaskList).ConfigureAwait(false);
+                ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>>[] results = await Task.WhenAll(initTaskList).ConfigureAwait(false);
                 results.CopyTo(aggregates, initializationBatchSize * i);
             }
 
@@ -117,7 +116,7 @@ namespace Corvus.EventStore.Sandbox
 
             var executeSw = Stopwatch.StartNew();
 
-            var taskList = new Task<TDLJ>[batchSize];
+            var taskList = new Task<ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>>>[batchSize];
 
             for (int i = 0; i < iterations; ++i)
             {
@@ -134,7 +133,7 @@ namespace Corvus.EventStore.Sandbox
                     {
                         for (int taskCount = 0; taskCount < batchSize; ++taskCount)
                         {
-                            TDLJ toDoList = aggregates[(batch * batchSize) + taskCount];
+                            ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>> toDoList = aggregates[(batch * batchSize) + taskCount];
                             for (int eventCount = 0; eventCount < eventsPerCommit; ++eventCount)
                             {
                                 toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
@@ -143,7 +142,7 @@ namespace Corvus.EventStore.Sandbox
                             taskList[taskCount] = toDoList.Commit();
                         }
 
-                        TDLJ[] batchAggregates = await Task.WhenAll(taskList).ConfigureAwait(false);
+                        ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>>[] batchAggregates = await Task.WhenAll(taskList).ConfigureAwait(false);
                         batchAggregates.CopyTo(aggregates, batch * batchSize);
                     }
 

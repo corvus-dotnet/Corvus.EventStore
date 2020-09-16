@@ -22,7 +22,7 @@ namespace Corvus.EventStore.Json
         /// <param name="eventHandler">The event handler.</param>
         /// <param name="streamReader">The stream reader.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public static void ProcessCommits<TEventHandler>(TEventHandler eventHandler, ref Utf8JsonStreamReader streamReader, CancellationToken cancellationToken)
+        public static void ProcessCommits<TEventHandler>(in TEventHandler eventHandler, ref Utf8JsonStreamReader streamReader, CancellationToken cancellationToken)
             where TEventHandler : IJsonEventFeedHandler
         {
             // Advance from the start array to the start of the object
@@ -42,7 +42,7 @@ namespace Corvus.EventStore.Json
         /// <param name="eventHandler">The event handler.</param>
         /// <param name="streamReader">The stream reader.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        public static void ProcessCommit<TEventHandler>(TEventHandler eventHandler, ref Utf8JsonStreamReader streamReader, CancellationToken cancellationToken)
+        public static void ProcessCommit<TEventHandler>(in TEventHandler eventHandler, ref Utf8JsonStreamReader streamReader, CancellationToken cancellationToken)
             where TEventHandler : IJsonEventFeedHandler
         {
             (Guid aggregateId, long commitSequenceNumber) = ValidateCommitAndFindEvents(ref streamReader);
@@ -76,7 +76,7 @@ namespace Corvus.EventStore.Json
         /// <param name="eventHandler">The event handler to process the event.</param>
         /// <param name="streamReader">The stream reader from which to read the events.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
-        private static void ProcessEvents<TEventHandler>(Guid aggregateId, long commitSequenceNumber, TEventHandler eventHandler, ref Utf8JsonStreamReader streamReader, CancellationToken cancellationToken)
+        private static void ProcessEvents<TEventHandler>(Guid aggregateId, long commitSequenceNumber, in TEventHandler eventHandler, ref Utf8JsonStreamReader streamReader, CancellationToken cancellationToken)
             where TEventHandler : IJsonEventFeedHandler
         {
             // Advance from the start array to the start of the event
@@ -195,20 +195,18 @@ namespace Corvus.EventStore.Json
         /// and parses entire events into memory when that may not be
         /// necessary.
         /// </summary>
-        /// <typeparam name="TEventHandler">The type of the event handler.</typeparam>
-        public readonly struct JsonEventFeedHandlerOverJsonSerializer<TEventHandler>
+        public readonly struct JsonEventFeedHandlerOverJsonSerializer
             : IJsonEventFeedHandler
-            where TEventHandler : IEventFeedHandler
         {
-            private readonly TEventHandler eventHandler;
+            private readonly IEventFeedHandler eventHandler;
             private readonly JsonSerializerOptions options;
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="JsonEventFeedHandlerOverJsonSerializer{TEventHandler}"/> struct.
+            /// Initializes a new instance of the <see cref="JsonEventFeedHandlerOverJsonSerializer"/> struct.
             /// </summary>
             /// <param name="eventHandler">The event handler.</param>
             /// <param name="options">The <see cref="JsonSerializerOptions"/> for serialization.</param>
-            public JsonEventFeedHandlerOverJsonSerializer(TEventHandler eventHandler, JsonSerializerOptions options)
+            public JsonEventFeedHandlerOverJsonSerializer(IEventFeedHandler eventHandler, JsonSerializerOptions options)
             {
                 this.eventHandler = eventHandler;
                 this.options = options;

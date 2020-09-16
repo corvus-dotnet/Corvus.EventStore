@@ -17,6 +17,6 @@ namespace Corvus.EventStore.Json
         /// </summary>
         /// <param name="payload">The payload to write.</param>
         /// <param name="writer">The writer to which to write the payload.</param>
-        void Write(TPayload payload, Utf8JsonWriter writer);
+        void Write(in TPayload payload, Utf8JsonWriter writer);
     }
 }

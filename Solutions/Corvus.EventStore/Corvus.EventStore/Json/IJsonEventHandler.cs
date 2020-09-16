@@ -24,7 +24,7 @@ namespace Corvus.EventStore.Json
         /// <param name="memento">The memento to which the event is to applied.</param>
         /// <param name="payload">The event payload to apply.</param>
         /// <returns>The memento with the event payload applied.</returns>
-        TMemento HandleEvent<TPayload>(Guid aggregateId, long commitSequenceNumber, JsonEncodedText eventType, long eventSequenceNumber, TMemento memento, TPayload payload);
+        TMemento HandleEvent<TPayload>(Guid aggregateId, long commitSequenceNumber, JsonEncodedText eventType, long eventSequenceNumber, in TMemento memento, in TPayload payload);
 
         /// <summary>
         /// Read the event payload from the reader and apply it to the memento.
@@ -55,6 +55,6 @@ namespace Corvus.EventStore.Json
         /// The ordering of elements within the schema is guaranteed.
         /// </para>
         /// </remarks>
-        TMemento HandleSerializedEvent(ref Utf8JsonStreamReader streamReader, Guid aggregateId, long commitSequenceNumber, long expectedEventSequenceNumber, TMemento memento);
+        TMemento HandleSerializedEvent(ref Utf8JsonStreamReader streamReader, Guid aggregateId, long commitSequenceNumber, long expectedEventSequenceNumber, in TMemento memento);
     }
 }

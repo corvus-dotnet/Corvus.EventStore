@@ -55,13 +55,11 @@ namespace Corvus.EventStore
         /// Add an event to the aggregate root.
         /// </summary>
         /// <typeparam name="TPayload">The payload of the event.</typeparam>
-        /// <typeparam name="TEventHandler">The type of th <see cref="IEventHandler{TMemento}"/>.</typeparam>
         /// <param name="eventType">The type of the event.</param>
         /// <param name="payload">The event payload.</param>
         /// <param name="eventHandler">The event handler that can apply the event to the memento.</param>
         /// <returns>The aggregate root with the uncommitted event added.</returns>
-        T ApplyEvent<TPayload, TEventHandler>(string eventType, TPayload payload, TEventHandler eventHandler)
-            where TEventHandler : IEventHandler<TMemento>;
+        T ApplyEvent<TPayload>(string eventType, in TPayload payload, IEventHandler<TMemento> eventHandler);
 
         /// <summary>
         /// Commits the events that have been added to the aggregate root.

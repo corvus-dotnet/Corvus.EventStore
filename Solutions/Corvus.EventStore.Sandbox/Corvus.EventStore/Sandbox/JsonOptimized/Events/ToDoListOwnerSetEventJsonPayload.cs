@@ -10,11 +10,6 @@ namespace Corvus.EventStore.Sandbox.Events
     /// <summary>
     /// An event payload for when the owner of the todo list is set.
     /// </summary>
-    /// <remarks>
-    /// Note that our payloads implement <see cref="IJsonEventPayloadWriter{TPayload}"/> directly.
-    /// You can if you wish move these out into a separate class and use <see cref="IJsonAggregateRoot{TMemento, T}.ApplyEvent{TPayload, TPayloadWriter, TEventHandler}(System.Text.Json.JsonEncodedText, TPayload, TPayloadWriter, TEventHandler)"/>
-    /// in your aggregate implementation (and similarly for your internal read methods).
-    /// </remarks>
     internal readonly struct ToDoListOwnerSetEventJsonPayload
     {
         /// <summary>
@@ -56,7 +51,7 @@ namespace Corvus.EventStore.Sandbox.Events
         internal readonly struct ReaderWriter : IJsonEventPayloadWriter<ToDoListOwnerSetEventJsonPayload>
         {
             /// <inheritdoc/>
-            public void Write(ToDoListOwnerSetEventJsonPayload payload, Utf8JsonWriter writer)
+            public void Write(in ToDoListOwnerSetEventJsonPayload payload, Utf8JsonWriter writer)
             {
                 writer.WriteStartObject();
                 writer.WriteString(OwnerProperty, payload.Owner);

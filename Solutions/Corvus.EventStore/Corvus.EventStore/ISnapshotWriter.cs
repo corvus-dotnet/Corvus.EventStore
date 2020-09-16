@@ -21,6 +21,6 @@ namespace Corvus.EventStore
         /// <param name="eventSequenceNumber">The sequence number of the event corresponding to this snapshot.</param>
         /// <param name="memento">The memento to write as a snapshot for this aggregate root.</param>
         /// <returns>A <see cref="Task"/> which completes once the snapshot is written.</returns>
-        Task Write<TMemento>(Guid aggregateId, long commitSequenceNumber, long eventSequenceNumber, TMemento memento);
+        Task Write<TMemento>(Guid aggregateId, long commitSequenceNumber, long eventSequenceNumber, in TMemento memento);
     }
 }

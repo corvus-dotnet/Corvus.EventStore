@@ -16,7 +16,7 @@ namespace Corvus.EventStore.AzureCosmos
     /// <summary>
     /// A <see cref="IJsonStore"/> implementation over a Cosmos container.
     /// </summary>
-    public readonly struct CosmosJsonStore : IJsonStore
+    public class CosmosJsonStore : IJsonStore
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="CosmosJsonStore"/> struct.

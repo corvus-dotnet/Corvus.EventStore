@@ -19,7 +19,7 @@ namespace Corvus.EventStore.Json
     /// <typeparam name="TMemento">The type of the internal memento for the aggregate root.</typeparam>
     /// <typeparam name="TJsonStore">The type of the Json Store to be used by this aggregate root.</typeparam>
     public readonly struct JsonAggregateRoot<TMemento, TJsonStore> : IJsonAggregateRoot<TMemento, JsonAggregateRoot<TMemento, TJsonStore>>
-        where TJsonStore : IJsonStore
+        where TJsonStore : class, IJsonStore
     {
         private readonly TJsonStore jsonStore;
         private readonly ArrayBufferWriter<byte> bufferWriter;
@@ -113,7 +113,7 @@ namespace Corvus.EventStore.Json
         /// <param name="eventHandler">The event handler.</param>
         /// <param name="streamReader">The stream reader.</param>
         /// <returns>The updated memento, commit sequence number and event sequence number once the events have been processed.</returns>
-        public static (TMemento, long) ProcessCommit<TEventHandler>(Guid aggregateId, long commitSequenceNumber, long eventSequenceNumber, TMemento memento, TEventHandler eventHandler, ref Utf8JsonStreamReader streamReader)
+        public static (TMemento, long) ProcessCommit<TEventHandler>(Guid aggregateId, long commitSequenceNumber, long eventSequenceNumber, in TMemento memento, in TEventHandler eventHandler, ref Utf8JsonStreamReader streamReader)
             where TEventHandler : IJsonEventHandler<TMemento>
         {
             ValidateCommitAndFindEvents(aggregateId, commitSequenceNumber, ref streamReader);
@@ -122,14 +122,13 @@ namespace Corvus.EventStore.Json
         }
 
         /// <inheritdoc/>
-        public JsonAggregateRoot<TMemento, TJsonStore> ApplyEvent<TPayload, TEventHandler>(string eventType, TPayload payload, TEventHandler eventHandler)
-            where TEventHandler : IEventHandler<TMemento>
+        public JsonAggregateRoot<TMemento, TJsonStore> ApplyEvent<TPayload>(string eventType, in TPayload payload, IEventHandler<TMemento> eventHandler)
         {
-            return this.ApplyEvent(JsonEncodedText.Encode(eventType), payload, new JsonSerializerPayloadWriter<TPayload>(this.options), new JsonEventHandlerOverJsonSerializer<TEventHandler>(eventHandler, this.options));
+            return this.ApplyEvent(JsonEncodedText.Encode(eventType), payload, new JsonSerializerPayloadWriter<TPayload>(this.options), new JsonEventHandlerOverJsonSerializer(eventHandler, this.options));
         }
 
         /// <inheritdoc/>
-        public JsonAggregateRoot<TMemento, TJsonStore> ApplyEvent<TPayload, TEventHandler>(JsonEncodedText eventType, TPayload payload, TEventHandler eventHandler)
+        public JsonAggregateRoot<TMemento, TJsonStore> ApplyEvent<TPayload, TEventHandler>(JsonEncodedText eventType, in TPayload payload, in TEventHandler eventHandler)
             where TPayload : IJsonEventPayloadWriter<TPayload>
             where TEventHandler : IJsonEventHandler<TMemento>
         {
@@ -137,7 +136,7 @@ namespace Corvus.EventStore.Json
         }
 
         /// <inheritdoc/>
-        public JsonAggregateRoot<TMemento, TJsonStore> ApplyEvent<TPayload, TPayloadWriter, TEventHandler>(JsonEncodedText eventType, TPayload payload, TPayloadWriter payloadWriter, TEventHandler eventHandler)
+        public JsonAggregateRoot<TMemento, TJsonStore> ApplyEvent<TPayload, TPayloadWriter, TEventHandler>(JsonEncodedText eventType, in TPayload payload, in TPayloadWriter payloadWriter, in TEventHandler eventHandler)
             where TPayloadWriter : IJsonEventPayloadWriter<TPayload>
             where TEventHandler : IJsonEventHandler<TMemento>
         {
@@ -211,7 +210,7 @@ namespace Corvus.EventStore.Json
         /// <param name="eventSequenceNumber">The event sequence number.</param>
         /// <param name="payload">The payload to write.</param>
         /// <param name="payloadWriter">A writer for the payload.</param>
-        private static void WriteEvent<TPayload, TPayloadWriter>(Utf8JsonWriter utf8JsonWriter, JsonEncodedText eventType, long eventSequenceNumber, TPayload payload, TPayloadWriter payloadWriter)
+        private static void WriteEvent<TPayload, TPayloadWriter>(Utf8JsonWriter utf8JsonWriter, JsonEncodedText eventType, long eventSequenceNumber, in TPayload payload, in TPayloadWriter payloadWriter)
             where TPayloadWriter : IJsonEventPayloadWriter<TPayload>
         {
             utf8JsonWriter.WriteStartObject();
@@ -335,7 +334,8 @@ namespace Corvus.EventStore.Json
             }
         }
 
-        private static (TMemento, long) ProcessEvents<TEventHandler>(Guid aggregateId, long commitSequenceNumber, long eventSequenceNumber, TMemento memento, TEventHandler eventHandler, ref Utf8JsonStreamReader streamReader)
+        // We expect memento to be copied in here so that we can update the value of the variable before we return the result
+        private static (TMemento, long) ProcessEvents<TEventHandler>(Guid aggregateId, long commitSequenceNumber, long eventSequenceNumber, TMemento memento, in TEventHandler eventHandler, ref Utf8JsonStreamReader streamReader)
             where TEventHandler : IJsonEventHandler<TMemento>
         {
             // Advance from the start array to the start of the event
@@ -382,7 +382,7 @@ namespace Corvus.EventStore.Json
             }
 
             /// <inheritdoc/>
-            public void Write(TPayload payload, Utf8JsonWriter writer)
+            public void Write(in TPayload payload, Utf8JsonWriter writer)
             {
                 JsonSerializer.Serialize(writer, payload, typeof(TPayload), this.options);
             }
@@ -396,27 +396,25 @@ namespace Corvus.EventStore.Json
         /// and parses entire events into memory when that may not be
         /// necessary.
         /// </summary>
-        /// <typeparam name="TEventHandler">The type of the event handler.</typeparam>
-        public readonly struct JsonEventHandlerOverJsonSerializer<TEventHandler>
+        public readonly struct JsonEventHandlerOverJsonSerializer
             : IJsonEventHandler<TMemento>
-            where TEventHandler : IEventHandler<TMemento>
         {
-            private readonly TEventHandler eventHandler;
+            private readonly IEventHandler<TMemento> eventHandler;
             private readonly JsonSerializerOptions options;
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="JsonEventHandlerOverJsonSerializer{TEventHandler}"/> struct.
+            /// Initializes a new instance of the <see cref="JsonEventHandlerOverJsonSerializer"/> struct.
             /// </summary>
             /// <param name="eventHandler">The event handler.</param>
             /// <param name="options">The <see cref="JsonSerializerOptions"/> for serialization.</param>
-            public JsonEventHandlerOverJsonSerializer(TEventHandler eventHandler, JsonSerializerOptions options)
+            public JsonEventHandlerOverJsonSerializer(IEventHandler<TMemento> eventHandler, JsonSerializerOptions options)
             {
                 this.eventHandler = eventHandler;
                 this.options = options;
             }
 
             /// <inheritdoc/>
-            public TMemento HandleSerializedEvent(ref Utf8JsonStreamReader streamReader, Guid aggregateId, long commitSequenceNumber, long expectedEventSequenceNumber, TMemento memento)
+            public TMemento HandleSerializedEvent(ref Utf8JsonStreamReader streamReader, Guid aggregateId, long commitSequenceNumber, long expectedEventSequenceNumber, in TMemento memento)
             {
                 long sequenceNumber = JsonEventHandler.ReadEventSequenceNumber(ref streamReader);
 
@@ -443,7 +441,7 @@ namespace Corvus.EventStore.Json
             }
 
             /// <inheritdoc/>
-            public TMemento HandleEvent<TPayload>(Guid aggregateId, long commitSequenceNumber, JsonEncodedText eventType, long eventSequenceNumber, TMemento memento, TPayload payload)
+            public TMemento HandleEvent<TPayload>(Guid aggregateId, long commitSequenceNumber, JsonEncodedText eventType, long eventSequenceNumber, in TMemento memento, in TPayload payload)
             {
                 // We pay for a conversion back to a string when going down this path
                 return this.eventHandler.HandleEvent(aggregateId, commitSequenceNumber, eventType.ToString(), eventSequenceNumber, memento, payload);
@@ -462,13 +460,12 @@ namespace Corvus.EventStore.Json
             }
         }
 
-        private readonly struct JsonElementPayloadReader : IPayloadReader
+        private class JsonElementPayloadReader : IPayloadReader
         {
             private readonly JsonElement jsonElement;
             private readonly JsonSerializerOptions options;
 
             public JsonElementPayloadReader(JsonElement payload, JsonSerializerOptions options)
-                : this()
             {
                 this.jsonElement = payload;
                 this.options = options;

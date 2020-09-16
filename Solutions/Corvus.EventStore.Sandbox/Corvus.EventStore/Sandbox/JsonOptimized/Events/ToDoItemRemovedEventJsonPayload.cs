@@ -52,7 +52,7 @@ namespace Corvus.EventStore.Sandbox.Events
         internal readonly struct ReaderWriter : IJsonEventPayloadWriter<ToDoItemRemovedEventJsonPayload>
         {
             /// <inheritdoc/>
-            public void Write(ToDoItemRemovedEventJsonPayload payload, Utf8JsonWriter writer)
+            public void Write(in ToDoItemRemovedEventJsonPayload payload, Utf8JsonWriter writer)
             {
                 writer.WriteStartObject();
                 writer.WriteString(IdProperty, payload.ToDoItemId);

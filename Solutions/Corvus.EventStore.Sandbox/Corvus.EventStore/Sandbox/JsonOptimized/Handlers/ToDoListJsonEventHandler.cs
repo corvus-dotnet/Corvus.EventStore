@@ -25,7 +25,7 @@ namespace Corvus.EventStore.Sandbox.Handlers
         public static ToDoListJsonEventHandler Instance => default;
 
         /// <inheritdoc/>
-        public ToDoListMementoJson HandleEvent<TPayload>(Guid aggregateId, long commitSequenceNumber, JsonEncodedText eventType, long eventSequenceNumber, ToDoListMementoJson memento, TPayload payload)
+        public ToDoListMementoJson HandleEvent<TPayload>(Guid aggregateId, long commitSequenceNumber, JsonEncodedText eventType, long eventSequenceNumber, in ToDoListMementoJson memento, in TPayload payload)
         {
             if (eventType.Equals(ToDoItemAddedEventJsonPayload.EncodedEventType))
             {
@@ -51,7 +51,7 @@ namespace Corvus.EventStore.Sandbox.Handlers
         }
 
         /// <inheritdoc/>
-        public ToDoListMementoJson HandleSerializedEvent(ref Utf8JsonStreamReader streamReader, Guid aggregateId, long commitSequenceNumber, long expectedEventSequenceNumber, ToDoListMementoJson memento)
+        public ToDoListMementoJson HandleSerializedEvent(ref Utf8JsonStreamReader streamReader, Guid aggregateId, long commitSequenceNumber, long expectedEventSequenceNumber, in ToDoListMementoJson memento)
         {
             long eventSequenceNumber = JsonEventHandler.ReadEventSequenceNumber(ref streamReader);
 
@@ -63,25 +63,27 @@ namespace Corvus.EventStore.Sandbox.Handlers
             // Find the event type
             JsonEventHandler.FindEventType(ref streamReader);
 
+            ToDoListMementoJson result;
+
             if (streamReader.Match(ToDoItemAddedEventJsonPayload.EventType))
             {
                 JsonEventHandler.FindPayload(ref streamReader);
-                memento = memento.WithToDoItemAdded(ToDoItemAddedEventJsonPayload.Converter.ReadToDoItemId(ref streamReader));
+                result = memento.WithToDoItemAdded(ToDoItemAddedEventJsonPayload.Converter.ReadToDoItemId(ref streamReader));
             }
             else if (streamReader.Match(ToDoItemRemovedEventJsonPayload.EventType))
             {
                 JsonEventHandler.FindPayload(ref streamReader);
-                memento = memento.WithToDoItemRemoved(ToDoItemRemovedEventJsonPayload.Converter.ReadToDoItemId(ref streamReader));
+                result = memento.WithToDoItemRemoved(ToDoItemRemovedEventJsonPayload.Converter.ReadToDoItemId(ref streamReader));
             }
             else if (streamReader.Match(ToDoListOwnerSetEventJsonPayload.EventType))
             {
                 JsonEventHandler.FindPayload(ref streamReader);
-                memento = memento.WithOwner(ToDoListOwnerSetEventJsonPayload.Converter.ReadOwner(ref streamReader));
+                result = memento.WithOwner(ToDoListOwnerSetEventJsonPayload.Converter.ReadOwner(ref streamReader));
             }
             else if (streamReader.Match(ToDoListStartDateSetEventJsonPayload.EventType))
             {
                 JsonEventHandler.FindPayload(ref streamReader);
-                memento = memento.WithStartDate(ToDoListStartDateSetEventJsonPayload.Converter.ReadStartDate(ref streamReader));
+                result = memento.WithStartDate(ToDoListStartDateSetEventJsonPayload.Converter.ReadStartDate(ref streamReader));
             }
             else
             {
@@ -89,7 +91,7 @@ namespace Corvus.EventStore.Sandbox.Handlers
             }
 
             JsonEventHandler.ReadToEndOfEvent(ref streamReader);
-            return memento;
+            return result;
         }
     }
 }

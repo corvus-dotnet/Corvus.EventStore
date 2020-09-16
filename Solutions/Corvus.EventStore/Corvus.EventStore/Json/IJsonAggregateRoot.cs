@@ -27,7 +27,7 @@ namespace Corvus.EventStore.Json
         /// <param name="payloadWriter">An <see cref="Action"/> that can write the given payload to the stream.</param>
         /// <param name="eventHandler">The <see cref="IEventHandler{TMemento}"/> that can apply the event to the memento.</param>
         /// <returns>The aggregate root with the event applied.</returns>
-        T ApplyEvent<TPayload, TPayloadWriter, TEventHandler>(JsonEncodedText eventType, TPayload payload, TPayloadWriter payloadWriter, TEventHandler eventHandler)
+        T ApplyEvent<TPayload, TPayloadWriter, TEventHandler>(JsonEncodedText eventType, in TPayload payload, in TPayloadWriter payloadWriter, in TEventHandler eventHandler)
             where TPayloadWriter : IJsonEventPayloadWriter<TPayload>
             where TEventHandler : IJsonEventHandler<TMemento>;
 
@@ -40,7 +40,7 @@ namespace Corvus.EventStore.Json
         /// <param name="payload">The payload to write.</param>
         /// <param name="eventHandler">The <see cref="IEventHandler{TMemento}"/> that can apply the event to the memento.</param>
         /// <returns>The aggregate root with the event applied.</returns>
-        T ApplyEvent<TPayload, TEventHandler>(JsonEncodedText eventType, TPayload payload, TEventHandler eventHandler)
+        T ApplyEvent<TPayload, TEventHandler>(JsonEncodedText eventType, in TPayload payload, in TEventHandler eventHandler)
             where TPayload : IJsonEventPayloadWriter<TPayload>
             where TEventHandler : IJsonEventHandler<TMemento>;
     }

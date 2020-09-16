@@ -60,14 +60,12 @@ namespace Corvus.EventStore.AzureCosmos
         /// Reads an aggregate root.
         /// </summary>
         /// <typeparam name="TMemento">The type of the memento for the aggregate root.</typeparam>
-        /// <typeparam name="TEventHandler">The type of the event reader for the aggregate root. This is an <see cref="IEventHandler{TMemento}"/>.</typeparam>
         /// <param name="id">The ID of the aggregate root.</param>
         /// <param name="partitionKey">The partition key for the aggregate root.</param>
         /// <param name="emptyMemento">The initial empty memento.</param>
         /// <param name="eventHandler">The event reader capable of decoding and applying the event payloads for this aggregate root.</param>
         /// <returns>A <see cref="Task{TResult}"/> which provide the <see cref="JsonAggregateRoot{TMemento, TJsonStore}"/> loaded from the store.</returns>
-        public Task<JsonAggregateRoot<TMemento, CosmosJsonStore>> Read<TMemento, TEventHandler>(Guid id, string partitionKey, TMemento emptyMemento, TEventHandler eventHandler)
-            where TEventHandler : IEventHandler<TMemento>
+        public Task<JsonAggregateRoot<TMemento, CosmosJsonStore>> Read<TMemento>(Guid id, string partitionKey, TMemento emptyMemento, IEventHandler<TMemento> eventHandler)
         {
             return this.Read(this.ContainerFactory.GetContainer(), this.SnapshotReader, id, partitionKey, emptyMemento, eventHandler, this.Options);
         }
@@ -91,14 +89,12 @@ namespace Corvus.EventStore.AzureCosmos
         /// <summary>
         /// Reads an event feed.
         /// </summary>
-        /// <typeparam name="TEventHandler">The type of the event reader for the event feed. This is an <see cref="IEventFeedHandler"/>.</typeparam>
         /// <param name="eventHandler">The event reader capable of decoding and applying the event payloads for this aggregate root.</param>
         /// <param name="pageSizeHint">A hint as to the number of items you get in a page of results.</param>
         /// <param name="continuationToken">The (optional) continuation token to resume the feed from a particular point.</param>
         /// <param name="cancellationToken">The cancellation token to terminate reading the feed.</param>
         /// <returns>A <see cref="Task{TResult}"/> which completes when the feed terminates.</returns>
-        public Task ReadFeed<TEventHandler>(TEventHandler eventHandler, int pageSizeHint, string? continuationToken, CancellationToken cancellationToken)
-            where TEventHandler : IEventFeedHandler
+        public Task ReadFeed(IEventFeedHandler eventHandler, int pageSizeHint, string? continuationToken, CancellationToken cancellationToken)
         {
             return this.ReadFeed(this.ContainerFactory.GetContainer(), eventHandler, pageSizeHint, continuationToken, this.Options, cancellationToken);
         }
@@ -142,10 +138,9 @@ namespace Corvus.EventStore.AzureCosmos
             return true;
         }
 
-        private Task<JsonAggregateRoot<TMemento, CosmosJsonStore>> Read<TMemento, TEventHandler>(Container container, TSnapshotReader snapshotReader, Guid id, string partitionKeyValue, TMemento emptyMemento, TEventHandler eventReader, JsonSerializerOptions options)
-            where TEventHandler : IEventHandler<TMemento>
+        private Task<JsonAggregateRoot<TMemento, CosmosJsonStore>> Read<TMemento>(Container container, TSnapshotReader snapshotReader, Guid id, string partitionKeyValue, TMemento emptyMemento, IEventHandler<TMemento> eventHandler, JsonSerializerOptions options)
         {
-            return this.ReadJson(container, snapshotReader, id, partitionKeyValue, emptyMemento, new JsonAggregateRoot<TMemento, CosmosJsonStore>.JsonEventHandlerOverJsonSerializer<TEventHandler>(eventReader, options), options);
+            return this.ReadJson(container, snapshotReader, id, partitionKeyValue, emptyMemento, new JsonAggregateRoot<TMemento, CosmosJsonStore>.JsonEventHandlerOverJsonSerializer(eventHandler, options), options);
         }
 
         private async Task<JsonAggregateRoot<TMemento, CosmosJsonStore>> ReadJson<TMemento, TEventHandler>(Container container, TSnapshotReader snapshotReader, Guid id, string partitionKeyValue, TMemento emptyMemento, TEventHandler eventHandler, JsonSerializerOptions options)
@@ -192,10 +187,9 @@ namespace Corvus.EventStore.AzureCosmos
             return new JsonAggregateRoot<TMemento, CosmosJsonStore>(id, memento!, this.jsonStore, bufferWriter, utf8JsonWriter, encodedPartitionKey, eventSequenceNumber, commitSequenceNumber, false, ReadOnlyMemory<byte>.Empty, options);
         }
 
-        private Task ReadFeed<TEventHandler>(Container container, TEventHandler eventHandler, int pageSizeHint, string? continuationToken, JsonSerializerOptions options, CancellationToken cancallationToken)
-            where TEventHandler : IEventFeedHandler
+        private Task ReadFeed(Container container, IEventFeedHandler eventHandler, int pageSizeHint, string? continuationToken, JsonSerializerOptions options, CancellationToken cancallationToken)
         {
-            return this.ReadFeedJson(container, new JsonEventFeed.JsonEventFeedHandlerOverJsonSerializer<TEventHandler>(eventHandler, options), pageSizeHint, continuationToken, options, cancallationToken);
+            return this.ReadFeedJson(container, new JsonEventFeed.JsonEventFeedHandlerOverJsonSerializer(eventHandler, options), pageSizeHint, continuationToken, options, cancallationToken);
         }
 
         private async Task ReadFeedJson<TEventHandler>(Container container, TEventHandler eventHandler, int pageSizeHint, string? continuationToken, JsonSerializerOptions options, CancellationToken cancellationToken)

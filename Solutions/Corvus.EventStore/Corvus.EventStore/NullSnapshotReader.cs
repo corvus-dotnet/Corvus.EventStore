@@ -10,12 +10,16 @@ namespace Corvus.EventStore
     /// <summary>
     /// A <see cref="ISnapshotReader"/> that will always return a null snapshot.
     /// </summary>
-    public readonly struct NullSnapshotReader : ISnapshotReader
+    public class NullSnapshotReader : ISnapshotReader
     {
+        private NullSnapshotReader()
+        {
+        }
+
         /// <summary>
         /// Gets an instance of a <see cref="NullSnapshotReader"/>.
         /// </summary>
-        public static NullSnapshotReader Instance = default;
+        public static NullSnapshotReader Instance { get; } = new NullSnapshotReader();
 
         /// <inheritdoc/>
         public Task<Snapshot<TMemento>?> Read<TMemento>(Guid aggregateId, long commitSequenceNumber)

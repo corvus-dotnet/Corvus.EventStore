@@ -21,7 +21,7 @@ namespace Corvus.EventStore.AzureCosmos
         /// <param name="snapshotReader">The snapshot reader.</param>
         /// <param name="options">The (optional) <see cref="JsonSerializerOptions"/>.</param>
         /// <returns>An instance of a <see cref="CosmosEventStore{TContainerFactory,TSnapshotReader}"/> initialized with an appropriate <see cref="ContainerFactory"/>.</returns>
-        public static CosmosEventStore<ContainerFactory, TSnapshotReader> GetInstance<TSnapshotReader>(string connectionString, string databaseName, string containerName, TSnapshotReader snapshotReader, JsonSerializerOptions? options = null)
+        public static CosmosEventStore<ContainerFactory, TSnapshotReader> GetInstance<TSnapshotReader>(string connectionString, string databaseName, string containerName, in TSnapshotReader snapshotReader, JsonSerializerOptions? options = null)
             where TSnapshotReader : ISnapshotReader
         {
             return new CosmosEventStore<ContainerFactory, TSnapshotReader>(new ContainerFactory(connectionString, databaseName, containerName), snapshotReader, options);
