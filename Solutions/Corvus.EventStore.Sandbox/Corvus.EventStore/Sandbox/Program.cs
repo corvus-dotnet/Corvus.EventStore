@@ -83,7 +83,7 @@ namespace Corvus.EventStore.Sandbox
                 .ToArray();
 
             const int batchSize = 50;
-            const int initializationBatchSize = 10;
+            const int initializationBatchSize = 50;
             const int iterations = 50;
             const int nodesPerAggregate = 8;
             const int minTimePerIteration = 1000;
