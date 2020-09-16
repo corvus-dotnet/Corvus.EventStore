@@ -31,7 +31,7 @@ namespace Corvus.EventStore.AzureCosmos
         private BlobContainerClient ContainerClient { get; }
 
         /// <inheritdoc/>
-        public Task Write(Stream stream, Guid aggregateId, long commitSequenceNumber, JsonEncodedText encodedPartitionKey)
+        public Task Write(Stream stream, Guid aggregateId, long commitSequenceNumber, string partitionKey, string etag)
         {
             ////var appendBlobClient = this.ContainerClient.GetAppendBlobClient(aggregateId.ToString())
             ////ResponseMessage response = await this.ContainerClient.GetAppendBlobClient((stream,).ConfigureAwait(false);

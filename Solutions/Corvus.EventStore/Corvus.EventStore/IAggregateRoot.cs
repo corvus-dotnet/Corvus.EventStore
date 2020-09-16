@@ -43,13 +43,14 @@ namespace Corvus.EventStore
         bool HasUncommittedEvents { get; }
 
         /// <summary>
-        /// Gets a value containing metadata created by the store.
+        /// Gets a value containing the etag for the aggregate root (if available).
         /// </summary>
-        /// <remarks>
-        /// You might use this to store e.g. an internal etag or other state information required
-        /// by the underlying store.
-        /// </remarks>
-        ReadOnlyMemory<byte> StoreMetadata { get; }
+        string ETag { get; }
+
+        /// <summary>
+        /// Gets a value containing the partition key value for the aggregate root (if available).
+        /// </summary>
+        string PartitionKey { get; }
 
         /// <summary>
         /// Add an event to the aggregate root.

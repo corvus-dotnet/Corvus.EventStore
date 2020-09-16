@@ -148,8 +148,6 @@ namespace Corvus.EventStore.AzureCosmos
         {
             var partitionKey = new PartitionKey(partitionKeyValue);
 
-            var encodedPartitionKey = JsonEncodedText.Encode(partitionKeyValue);
-
             long commitSequenceNumber = -1;
             long eventSequenceNumber = -1;
             TMemento memento = emptyMemento;
@@ -184,7 +182,7 @@ namespace Corvus.EventStore.AzureCosmos
 
             var bufferWriter = new ArrayBufferWriter<byte>();
             var utf8JsonWriter = new Utf8JsonWriter(bufferWriter, new JsonWriterOptions { Encoder = options.Encoder, Indented = options.WriteIndented, SkipValidation = false });
-            return new JsonAggregateRoot<TMemento, CosmosJsonStore>(id, memento!, this.jsonStore, bufferWriter, utf8JsonWriter, encodedPartitionKey, eventSequenceNumber, commitSequenceNumber, false, ReadOnlyMemory<byte>.Empty, options);
+            return new JsonAggregateRoot<TMemento, CosmosJsonStore>(id, memento!, this.jsonStore, bufferWriter, utf8JsonWriter, partitionKeyValue, eventSequenceNumber, commitSequenceNumber, false, string.Empty, options);
         }
 
         private Task ReadFeed(Container container, IEventFeedHandler eventHandler, int pageSizeHint, string? continuationToken, JsonSerializerOptions options, CancellationToken cancallationToken)

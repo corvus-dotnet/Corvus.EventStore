@@ -25,7 +25,6 @@ namespace Corvus.EventStore.Json
         private readonly ArrayBufferWriter<byte> bufferWriter;
         private readonly Utf8JsonWriter utf8JsonWriter;
         private readonly JsonSerializerOptions options;
-        private readonly JsonEncodedText encodedPartitionKey;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="JsonAggregateRoot{TMemento,TJsonStore}"/> struct.
@@ -35,24 +34,24 @@ namespace Corvus.EventStore.Json
         /// <param name="jsonStore">The json store from which to read and write the json stream.</param>
         /// <param name="bufferWriter">The buffer writer into which we are writing.</param>
         /// <param name="utf8JsonWriter">The Utf8 json writer over which this aggregate root is implemented.</param>
-        /// <param name="encodedPartitionKey">Json encoded text for the partition key.</param>
+        /// <param name="partitionKey">A string for the partition key.</param>
         /// <param name="eventSequenceNumber">The <see cref="EventSequenceNumber"/>.</param>
         /// <param name="commitSequenceNumber">The <see cref="CommitSequenceNumber"/>.</param>
         /// <param name="hasUncommittedEvents">A valut that indicates whether the aggregate has uncommitted events.</param>
-        /// <param name="storeMetadata">Metadata applied to the root by the store.</param>
+        /// <param name="etag">Etag associated with this instance.</param>
         /// <param name="options">The JSON serializer options for the aggregate root.</param>
-        public JsonAggregateRoot(Guid id, TMemento memento, TJsonStore jsonStore, ArrayBufferWriter<byte> bufferWriter, Utf8JsonWriter utf8JsonWriter, JsonEncodedText encodedPartitionKey, long eventSequenceNumber, long commitSequenceNumber, bool hasUncommittedEvents, ReadOnlyMemory<byte> storeMetadata, JsonSerializerOptions options)
+        public JsonAggregateRoot(Guid id, TMemento memento, TJsonStore jsonStore, ArrayBufferWriter<byte> bufferWriter, Utf8JsonWriter utf8JsonWriter, string partitionKey, long eventSequenceNumber, long commitSequenceNumber, bool hasUncommittedEvents, string etag, JsonSerializerOptions options)
         {
             this.Id = id;
             this.Memento = memento;
             this.jsonStore = jsonStore;
             this.bufferWriter = bufferWriter;
             this.utf8JsonWriter = utf8JsonWriter;
-            this.encodedPartitionKey = encodedPartitionKey;
+            this.PartitionKey = partitionKey;
             this.EventSequenceNumber = eventSequenceNumber;
             this.CommitSequenceNumber = commitSequenceNumber;
             this.HasUncommittedEvents = hasUncommittedEvents;
-            this.StoreMetadata = storeMetadata;
+            this.ETag = etag;
             this.options = options;
         }
 
@@ -72,7 +71,10 @@ namespace Corvus.EventStore.Json
         public TMemento Memento { get; }
 
         /// <inheritdoc/>
-        public ReadOnlyMemory<byte> StoreMetadata { get; }
+        public string ETag { get; }
+
+        /// <inheritdoc/>
+        public string PartitionKey { get; }
 
         /// <summary>
         /// Process an array of commits.
@@ -142,14 +144,14 @@ namespace Corvus.EventStore.Json
         {
             if (!this.HasUncommittedEvents)
             {
-                WriteStartCommit(this.utf8JsonWriter, this.Id, this.CommitSequenceNumber + 1, this.encodedPartitionKey);
+                WriteStartCommit(this.utf8JsonWriter, this.Id, this.CommitSequenceNumber + 1, this.PartitionKey);
             }
 
             WriteEvent(this.utf8JsonWriter, eventType, this.EventSequenceNumber + 1, payload, payloadWriter);
 
             TMemento memento = eventHandler.HandleEvent(this.Id, this.CommitSequenceNumber, eventType, this.EventSequenceNumber + 1, this.Memento, payload);
 
-            return new JsonAggregateRoot<TMemento, TJsonStore>(this.Id, memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.encodedPartitionKey, this.EventSequenceNumber + 1, this.CommitSequenceNumber, true, this.StoreMetadata, this.options);
+            return new JsonAggregateRoot<TMemento, TJsonStore>(this.Id, memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.PartitionKey, this.EventSequenceNumber + 1, this.CommitSequenceNumber, true, this.ETag, this.options);
         }
 
         /// <inheritdoc/>
@@ -159,12 +161,12 @@ namespace Corvus.EventStore.Json
 
             using var stream = new ReadOnlyMemoryStream(this.bufferWriter.WrittenMemory);
 
-            await this.jsonStore.Write(stream, this.Id, this.CommitSequenceNumber + 1, this.encodedPartitionKey).ConfigureAwait(false);
+            await this.jsonStore.Write(stream, this.Id, this.CommitSequenceNumber + 1, this.PartitionKey, this.ETag).ConfigureAwait(false);
 
             this.bufferWriter.Clear();
             this.utf8JsonWriter.Reset();
 
-            return new JsonAggregateRoot<TMemento, TJsonStore>(this.Id, this.Memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.encodedPartitionKey, this.EventSequenceNumber, this.CommitSequenceNumber + 1, false, this.StoreMetadata, this.options);
+            return new JsonAggregateRoot<TMemento, TJsonStore>(this.Id, this.Memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.PartitionKey, this.EventSequenceNumber, this.CommitSequenceNumber + 1, false, this.ETag, this.options);
         }
 
         /// <summary>
@@ -173,8 +175,8 @@ namespace Corvus.EventStore.Json
         /// <param name="utf8JsonWriter">The writer to which to write the commit.</param>
         /// <param name="aggregateId">The aggregate ID for the commit.</param>
         /// <param name="commitSequenceNumber">The sequence number for the commit.</param>
-        /// <param name="encodedPartitionKey">The encoded partition key for the commit.</param>
-        private static void WriteStartCommit(Utf8JsonWriter utf8JsonWriter, Guid aggregateId, long commitSequenceNumber, JsonEncodedText encodedPartitionKey)
+        /// <param name="partitionKey">The encoded partition key for the commit.</param>
+        private static void WriteStartCommit(Utf8JsonWriter utf8JsonWriter, Guid aggregateId, long commitSequenceNumber, string partitionKey)
         {
             // Rent a small buffer - sufficient for a 32-character Guid + separators, plus a long
             byte[] buffer = ArrayPool<byte>.Shared.Rent(120);
@@ -188,7 +190,7 @@ namespace Corvus.EventStore.Json
                 // also be modified to deal with either old or new versioning.
                 utf8JsonWriter.WriteStartObject();
                 utf8JsonWriter.WriteString(JsonCommit.IdPropertyName, buffer.AsSpan().Slice(0, bytesWrittenForId + bytesWrittenForSequenceNumber));
-                utf8JsonWriter.WriteString(JsonCommit.PartitionKeyPropertyName, encodedPartitionKey);
+                utf8JsonWriter.WriteString(JsonCommit.PartitionKeyPropertyName, partitionKey);
                 utf8JsonWriter.WriteString(JsonCommit.AggregateIdPropertyName, buffer.AsSpan().Slice(0, bytesWrittenForId));
                 utf8JsonWriter.WriteNumber(JsonCommit.CommitSequenceNumberPropertyName, commitSequenceNumber);
                 utf8JsonWriter.WritePropertyName(JsonCommit.EventsPropertyName);
