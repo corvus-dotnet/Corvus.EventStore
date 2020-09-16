@@ -189,7 +189,7 @@ namespace Corvus.EventStore.AzureCosmos
 
             var bufferWriter = new ArrayBufferWriter<byte>();
             var utf8JsonWriter = new Utf8JsonWriter(bufferWriter, new JsonWriterOptions { Encoder = options.Encoder, Indented = options.WriteIndented, SkipValidation = false });
-            return new JsonAggregateRoot<TMemento, CosmosJsonStore>(id, memento!, this.jsonStore, bufferWriter, utf8JsonWriter, encodedPartitionKey, eventSequenceNumber, commitSequenceNumber, false, options);
+            return new JsonAggregateRoot<TMemento, CosmosJsonStore>(id, memento!, this.jsonStore, bufferWriter, utf8JsonWriter, encodedPartitionKey, eventSequenceNumber, commitSequenceNumber, false, ReadOnlyMemory<byte>.Empty, options);
         }
 
         private Task ReadFeed<TEventHandler>(Container container, TEventHandler eventHandler, int pageSizeHint, string? continuationToken, JsonSerializerOptions options, CancellationToken cancallationToken)

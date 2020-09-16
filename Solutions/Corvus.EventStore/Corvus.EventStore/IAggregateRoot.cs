@@ -43,6 +43,15 @@ namespace Corvus.EventStore
         bool HasUncommittedEvents { get; }
 
         /// <summary>
+        /// Gets a value containing metadata created by the store.
+        /// </summary>
+        /// <remarks>
+        /// You might use this to store e.g. an internal etag or other state information required
+        /// by the underlying store.
+        /// </remarks>
+        ReadOnlyMemory<byte> StoreMetadata { get; }
+
+        /// <summary>
         /// Add an event to the aggregate root.
         /// </summary>
         /// <typeparam name="TPayload">The payload of the event.</typeparam>

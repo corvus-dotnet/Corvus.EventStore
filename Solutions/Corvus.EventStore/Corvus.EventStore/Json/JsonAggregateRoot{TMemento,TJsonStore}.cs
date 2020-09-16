@@ -39,8 +39,9 @@ namespace Corvus.EventStore.Json
         /// <param name="eventSequenceNumber">The <see cref="EventSequenceNumber"/>.</param>
         /// <param name="commitSequenceNumber">The <see cref="CommitSequenceNumber"/>.</param>
         /// <param name="hasUncommittedEvents">A valut that indicates whether the aggregate has uncommitted events.</param>
+        /// <param name="storeMetadata">Metadata applied to the root by the store.</param>
         /// <param name="options">The JSON serializer options for the aggregate root.</param>
-        public JsonAggregateRoot(Guid id, TMemento memento, TJsonStore jsonStore, ArrayBufferWriter<byte> bufferWriter, Utf8JsonWriter utf8JsonWriter, JsonEncodedText encodedPartitionKey, long eventSequenceNumber, long commitSequenceNumber, bool hasUncommittedEvents, JsonSerializerOptions options)
+        public JsonAggregateRoot(Guid id, TMemento memento, TJsonStore jsonStore, ArrayBufferWriter<byte> bufferWriter, Utf8JsonWriter utf8JsonWriter, JsonEncodedText encodedPartitionKey, long eventSequenceNumber, long commitSequenceNumber, bool hasUncommittedEvents, ReadOnlyMemory<byte> storeMetadata, JsonSerializerOptions options)
         {
             this.Id = id;
             this.Memento = memento;
@@ -51,6 +52,7 @@ namespace Corvus.EventStore.Json
             this.EventSequenceNumber = eventSequenceNumber;
             this.CommitSequenceNumber = commitSequenceNumber;
             this.HasUncommittedEvents = hasUncommittedEvents;
+            this.StoreMetadata = storeMetadata;
             this.options = options;
         }
 
@@ -68,6 +70,9 @@ namespace Corvus.EventStore.Json
 
         /// <inheritdoc/>
         public TMemento Memento { get; }
+
+        /// <inheritdoc/>
+        public ReadOnlyMemory<byte> StoreMetadata { get; }
 
         /// <summary>
         /// Process an array of commits.
@@ -145,7 +150,7 @@ namespace Corvus.EventStore.Json
 
             TMemento memento = eventHandler.HandleEvent(this.Id, this.CommitSequenceNumber, eventType, this.EventSequenceNumber + 1, this.Memento, payload);
 
-            return new JsonAggregateRoot<TMemento, TJsonStore>(this.Id, memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.encodedPartitionKey, this.EventSequenceNumber + 1, this.CommitSequenceNumber, true, this.options);
+            return new JsonAggregateRoot<TMemento, TJsonStore>(this.Id, memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.encodedPartitionKey, this.EventSequenceNumber + 1, this.CommitSequenceNumber, true, this.StoreMetadata, this.options);
         }
 
         /// <inheritdoc/>
@@ -160,7 +165,7 @@ namespace Corvus.EventStore.Json
             this.bufferWriter.Clear();
             this.utf8JsonWriter.Reset();
 
-            return new JsonAggregateRoot<TMemento, TJsonStore>(this.Id, this.Memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.encodedPartitionKey, this.EventSequenceNumber, this.CommitSequenceNumber + 1, false, this.options);
+            return new JsonAggregateRoot<TMemento, TJsonStore>(this.Id, this.Memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.encodedPartitionKey, this.EventSequenceNumber, this.CommitSequenceNumber + 1, false, this.StoreMetadata, this.options);
         }
 
         /// <summary>
