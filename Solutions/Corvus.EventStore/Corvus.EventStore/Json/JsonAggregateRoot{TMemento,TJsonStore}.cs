@@ -19,7 +19,7 @@ namespace Corvus.EventStore.Json
     /// <typeparam name="TMemento">The type of the internal memento for the aggregate root.</typeparam>
     /// <typeparam name="TJsonStore">The type of the Json Store to be used by this aggregate root.</typeparam>
     public readonly struct JsonAggregateRoot<TMemento, TJsonStore> : IJsonAggregateRoot<TMemento, JsonAggregateRoot<TMemento, TJsonStore>>
-        where TJsonStore : class, IJsonStore
+        where TJsonStore : IJsonStore
     {
         private readonly TJsonStore jsonStore;
         private readonly ArrayBufferWriter<byte> bufferWriter;
