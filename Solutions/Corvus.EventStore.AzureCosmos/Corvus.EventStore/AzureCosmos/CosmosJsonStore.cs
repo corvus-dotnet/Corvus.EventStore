@@ -32,7 +32,9 @@ namespace Corvus.EventStore.AzureCosmos
         /// <inheritdoc/>
         public async Task Write(Stream stream, Guid aggregateId, long commitSequenceNumber, JsonEncodedText encodedPartitionKey)
         {
-            ResponseMessage response = await this.Container.CreateItemStreamAsync(stream, new PartitionKey(encodedPartitionKey.ToString())).ConfigureAwait(false);
+            var options = new ItemRequestOptions { EnableContentResponseOnWrite = false };
+
+            ResponseMessage response = await this.Container.CreateItemStreamAsync(stream, new PartitionKey(encodedPartitionKey.ToString()), options).ConfigureAwait(false);
 
             if (response.IsSuccessStatusCode)
             {

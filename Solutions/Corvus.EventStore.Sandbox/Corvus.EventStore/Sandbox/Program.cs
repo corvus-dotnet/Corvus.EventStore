@@ -37,9 +37,9 @@ namespace Corvus.EventStore.Sandbox
 
             var eventStore = CosmosEventStore.GetInstance(connectionstring, "corvuseventstore", "corvusevents", NullSnapshotReader.Instance);
 
-            var cts = new CancellationTokenSource();
-            var eventFeedHandler = new ToDoListEventFeedHandler();
-            Task feedTask = eventStore.ReadFeed(eventFeedHandler, 100, null, cts.Token);
+            ////var cts = new CancellationTokenSource();
+            ////var eventFeedHandler = new ToDoListEventFeedHandler();
+            ////Task feedTask = eventStore.ReadFeed(eventFeedHandler, 100, null, cts.Token);
 
             var toDoListId = Guid.NewGuid();
 
@@ -66,11 +66,11 @@ namespace Corvus.EventStore.Sandbox
 
             Console.ReadKey();
 
-            cts.Cancel();
-            await feedTask.ConfigureAwait(false);
+            ////cts.Cancel();
+            ////await feedTask.ConfigureAwait(false);
 
-            Console.WriteLine($"Seen {eventFeedHandler.TotalCommitCount} commits containing {eventFeedHandler.TotalEventCount} events.");
-            ////await WriteVolume(connectionstring).ConfigureAwait(false);
+            ////Console.WriteLine($"Seen {eventFeedHandler.TotalCommitCount} commits containing {eventFeedHandler.TotalEventCount} events.");
+            await WriteVolume(connectionstring).ConfigureAwait(false);
         }
 
         private static async Task WriteVolume(string connectionString)
