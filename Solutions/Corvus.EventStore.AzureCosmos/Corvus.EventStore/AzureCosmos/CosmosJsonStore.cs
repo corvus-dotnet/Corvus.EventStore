@@ -18,6 +18,8 @@ namespace Corvus.EventStore.AzureCosmos
     /// </summary>
     public class CosmosJsonStore : IJsonStore
     {
+        private static readonly ItemRequestOptions Options = new ItemRequestOptions { EnableContentResponseOnWrite = false };
+
         /// <summary>
         /// Initializes a new instance of the <see cref="CosmosJsonStore"/> struct.
         /// </summary>
@@ -32,9 +34,7 @@ namespace Corvus.EventStore.AzureCosmos
         /// <inheritdoc/>
         public async Task Write(Stream stream, Guid aggregateId, long commitSequenceNumber, JsonEncodedText encodedPartitionKey)
         {
-            var options = new ItemRequestOptions { EnableContentResponseOnWrite = false };
-
-            ResponseMessage response = await this.Container.CreateItemStreamAsync(stream, new PartitionKey(encodedPartitionKey.ToString()), options).ConfigureAwait(false);
+            ResponseMessage response = await this.Container.CreateItemStreamAsync(stream, new PartitionKey(encodedPartitionKey.ToString()), Options).ConfigureAwait(false);
 
             if (response.IsSuccessStatusCode)
             {
