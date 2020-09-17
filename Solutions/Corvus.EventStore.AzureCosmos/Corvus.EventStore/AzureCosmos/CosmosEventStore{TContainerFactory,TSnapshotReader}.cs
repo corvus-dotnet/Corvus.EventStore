@@ -19,13 +19,13 @@ namespace Corvus.EventStore.AzureCosmos
     /// </summary>
     /// <typeparam name="TContainerFactory">The type of the <see cref="IContainerFactory"/> to use.</typeparam>
     /// <typeparam name="TSnapshotReader">The type of snapshot reader to use.</typeparam>
-    public readonly struct CosmosEventStore<TContainerFactory, TSnapshotReader>
+    public class CosmosEventStore<TContainerFactory, TSnapshotReader> : IJsonEventStore
         where TContainerFactory : IContainerFactory
         where TSnapshotReader : ISnapshotReader
     {
         private const string DocumentsName = "Documents";
 
-        private readonly CosmosJsonStore jsonStore;
+        private readonly CosmosStreamStore jsonStore;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CosmosEventStore{TContainerFactory, TSnapshotReader}"/> class.
@@ -38,7 +38,7 @@ namespace Corvus.EventStore.AzureCosmos
             this.ContainerFactory = containerFactory;
             this.SnapshotReader = snapshotReader;
             this.Options = options ?? new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-            this.jsonStore = new CosmosJsonStore(containerFactory.GetContainer());
+            this.jsonStore = new CosmosStreamStore(containerFactory.GetContainer());
         }
 
         /// <summary>
@@ -56,31 +56,27 @@ namespace Corvus.EventStore.AzureCosmos
         /// </summary>
         public JsonSerializerOptions Options { get; }
 
-        /// <summary>
-        /// Reads an aggregate root.
-        /// </summary>
-        /// <typeparam name="TMemento">The type of the memento for the aggregate root.</typeparam>
-        /// <param name="id">The ID of the aggregate root.</param>
-        /// <param name="partitionKey">The partition key for the aggregate root.</param>
-        /// <param name="emptyMemento">The initial empty memento.</param>
-        /// <param name="eventHandler">The event reader capable of decoding and applying the event payloads for this aggregate root.</param>
-        /// <returns>A <see cref="Task{TResult}"/> which provide the <see cref="JsonAggregateRoot{TMemento, TJsonStore}"/> loaded from the store.</returns>
-        public Task<JsonAggregateRoot<TMemento, CosmosJsonStore>> Read<TMemento>(Guid id, string partitionKey, TMemento emptyMemento, IEventHandler<TMemento> eventHandler)
+        /// <inheritdoc/>
+        async Task<IAggregateRoot<TMemento>> IEventStore.Read<TMemento>(Guid id, TMemento emptyMemento, IEventHandler<TMemento> eventHandler)
         {
-            return this.Read(this.ContainerFactory.GetContainer(), this.SnapshotReader, id, partitionKey, emptyMemento, eventHandler, this.Options);
+            return await this.Read(this.ContainerFactory.GetContainer(), this.SnapshotReader, id, id.ToString(), emptyMemento, eventHandler, this.Options).ConfigureAwait(false);
         }
 
-        /// <summary>
-        /// Reads an aggregate root.
-        /// </summary>
-        /// <typeparam name="TMemento">The type of the memento> for the aggregate root.</typeparam>
-        /// <typeparam name="TEventHandler">The type of the payload reader for the aggregate root. This is an <see cref="IJsonEventHandler{TMemento}"/>.</typeparam>
-        /// <param name="id">The ID of the aggregate root.</param>
-        /// <param name="partitionKey">The partition key for the aggregate root.</param>
-        /// <param name="emptyMemento">The initial empty memento.</param>
-        /// <param name="eventHandler">The payload reader capable of decoding and applying the event payloads for this aggregate root.</param>
-        /// <returns>A <see cref="Task{TResult}"/> which provide the <see cref="JsonAggregateRoot{TMemento, TJsonStore}"/> loaded from the store.</returns>
-        public Task<JsonAggregateRoot<TMemento, CosmosJsonStore>> ReadJson<TMemento, TEventHandler>(Guid id, string partitionKey, TMemento emptyMemento, TEventHandler eventHandler)
+        /// <inheritdoc/>
+        async Task<IAggregateRoot<TMemento>> IEventStore.Read<TMemento>(Guid id, string partitionKey, TMemento emptyMemento, IEventHandler<TMemento> eventHandler)
+        {
+            return await this.Read(this.ContainerFactory.GetContainer(), this.SnapshotReader, id, partitionKey, emptyMemento, eventHandler, this.Options).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        public Task<JsonAggregateRoot<TMemento>> Read<TMemento, TEventHandler>(Guid id, TMemento emptyMemento, TEventHandler eventHandler)
+            where TEventHandler : IJsonEventHandler<TMemento>
+        {
+            return this.ReadJson(this.ContainerFactory.GetContainer(), this.SnapshotReader, id, id.ToString(), emptyMemento, eventHandler, this.Options);
+        }
+
+        /// <inheritdoc/>
+        public Task<JsonAggregateRoot<TMemento>> Read<TMemento, TEventHandler>(Guid id, string partitionKey, TMemento emptyMemento, TEventHandler eventHandler)
             where TEventHandler : IJsonEventHandler<TMemento>
         {
             return this.ReadJson(this.ContainerFactory.GetContainer(), this.SnapshotReader, id, partitionKey, emptyMemento, eventHandler, this.Options);
@@ -138,12 +134,12 @@ namespace Corvus.EventStore.AzureCosmos
             return true;
         }
 
-        private Task<JsonAggregateRoot<TMemento, CosmosJsonStore>> Read<TMemento>(Container container, TSnapshotReader snapshotReader, Guid id, string partitionKeyValue, TMemento emptyMemento, IEventHandler<TMemento> eventHandler, JsonSerializerOptions options)
+        private Task<JsonAggregateRoot<TMemento>> Read<TMemento>(Container container, TSnapshotReader snapshotReader, Guid id, string partitionKeyValue, TMemento emptyMemento, IEventHandler<TMemento> eventHandler, JsonSerializerOptions options)
         {
-            return this.ReadJson(container, snapshotReader, id, partitionKeyValue, emptyMemento, new JsonAggregateRoot<TMemento, CosmosJsonStore>.JsonEventHandlerOverJsonSerializer(eventHandler, options), options);
+            return this.ReadJson(container, snapshotReader, id, partitionKeyValue, emptyMemento, new JsonAggregateRoot<TMemento>.JsonEventHandlerOverJsonSerializer(eventHandler, options), options);
         }
 
-        private async Task<JsonAggregateRoot<TMemento, CosmosJsonStore>> ReadJson<TMemento, TEventHandler>(Container container, TSnapshotReader snapshotReader, Guid id, string partitionKeyValue, TMemento emptyMemento, TEventHandler eventHandler, JsonSerializerOptions options)
+        private async Task<JsonAggregateRoot<TMemento>> ReadJson<TMemento, TEventHandler>(Container container, TSnapshotReader snapshotReader, Guid id, string partitionKeyValue, TMemento emptyMemento, TEventHandler eventHandler, JsonSerializerOptions options)
             where TEventHandler : IJsonEventHandler<TMemento>
         {
             var partitionKey = new PartitionKey(partitionKeyValue);
@@ -182,7 +178,7 @@ namespace Corvus.EventStore.AzureCosmos
 
             var bufferWriter = new ArrayBufferWriter<byte>();
             var utf8JsonWriter = new Utf8JsonWriter(bufferWriter, new JsonWriterOptions { Encoder = options.Encoder, Indented = options.WriteIndented, SkipValidation = false });
-            return new JsonAggregateRoot<TMemento, CosmosJsonStore>(id, memento!, this.jsonStore, bufferWriter, utf8JsonWriter, partitionKeyValue, eventSequenceNumber, commitSequenceNumber, false, string.Empty, options);
+            return new JsonAggregateRoot<TMemento>(id, memento!, this.jsonStore, bufferWriter, utf8JsonWriter, partitionKeyValue, eventSequenceNumber, commitSequenceNumber, false, ReadOnlyMemory<byte>.Empty, options);
         }
 
         private Task ReadFeed(Container container, IEventFeedHandler eventHandler, int pageSizeHint, string? continuationToken, JsonSerializerOptions options, CancellationToken cancallationToken)
@@ -247,7 +243,7 @@ namespace Corvus.EventStore.AzureCosmos
             }
 
             // We are now at the start of an array of commits
-            return JsonAggregateRoot<TMemento, CosmosJsonStore>.ProcessCommits(aggregateId, commitSequenceNumber, eventSequenceNumber, memento, eventHandler, ref streamReader);
+            return JsonAggregateRoot<TMemento>.ProcessCommits(aggregateId, commitSequenceNumber, eventSequenceNumber, memento, eventHandler, ref streamReader);
         }
     }
 }

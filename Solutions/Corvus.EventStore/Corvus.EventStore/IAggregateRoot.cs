@@ -11,9 +11,7 @@ namespace Corvus.EventStore
     /// An interface implemented by aggregate roots.
     /// </summary>
     /// <typeparam name="TMemento">The type of the memento for the aggregate root.</typeparam>
-    /// <typeparam name="T">The type of the entity implementing this interface.</typeparam>
-    public interface IAggregateRoot<TMemento, T>
-        where T : IAggregateRoot<TMemento, T>
+    public interface IAggregateRoot<TMemento>
     {
         /// <summary>
         /// Gets the unique id of the aggregate root.
@@ -43,9 +41,9 @@ namespace Corvus.EventStore
         bool HasUncommittedEvents { get; }
 
         /// <summary>
-        /// Gets a value containing the etag for the aggregate root (if available).
+        /// Gets a value containing the store metadata for the aggregate root.
         /// </summary>
-        string ETag { get; }
+        ReadOnlyMemory<byte> StoreMetadata { get; }
 
         /// <summary>
         /// Gets a value containing the partition key value for the aggregate root (if available).
@@ -60,12 +58,12 @@ namespace Corvus.EventStore
         /// <param name="payload">The event payload.</param>
         /// <param name="eventHandler">The event handler that can apply the event to the memento.</param>
         /// <returns>The aggregate root with the uncommitted event added.</returns>
-        T ApplyEvent<TPayload>(string eventType, in TPayload payload, IEventHandler<TMemento> eventHandler);
+        IAggregateRoot<TMemento> ApplyEvent<TPayload>(string eventType, in TPayload payload, IEventHandler<TMemento> eventHandler);
 
         /// <summary>
         /// Commits the events that have been added to the aggregate root.
         /// </summary>
         /// <returns>The aggregate root with the events committed.</returns>
-        Task<T> Commit();
+        Task<IAggregateRoot<TMemento>> Commit();
     }
 }

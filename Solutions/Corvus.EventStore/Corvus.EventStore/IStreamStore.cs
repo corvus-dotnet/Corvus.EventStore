@@ -1,8 +1,8 @@
-﻿// <copyright file="IJsonStore.cs" company="Endjin Limited">
+﻿// <copyright file="IStreamStore.cs" company="Endjin Limited">
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
-namespace Corvus.EventStore.Json
+namespace Corvus.EventStore
 {
     using System;
     using System.IO;
@@ -11,7 +11,7 @@ namespace Corvus.EventStore.Json
     /// <summary>
     /// Implemented by types which can store and retrieve JSON commits.
     /// </summary>
-    public interface IJsonStore
+    public interface IStreamStore
     {
         /// <summary>
         /// Write the given stream to the store, using the specified partition key.
@@ -20,9 +20,9 @@ namespace Corvus.EventStore.Json
         /// <param name="aggregateId">The aggregate ID that is being written.</param>
         /// <param name="commitSequenceNumber">The commit sequence number that is being written.</param>
         /// <param name="partitionKey">The partition key.</param>
-        /// <param name="etag">The etag if avilable.</param>
-        /// <returns>A <see cref="Task"/> which completes onece the item is written.</returns>
+        /// <param name="storeMetadata">Metadata about the commit from the store.</param>
+        /// <returns>A <see cref="Task"/> which provides the store metadata returned from the result.</returns>
         /// <exception cref="ConcurrencyException">Thrown if a commit was already made for the given aggregate ID and sequence number.</exception>
-        Task Write(Stream stream, Guid aggregateId, long commitSequenceNumber, string partitionKey, string etag);
+        Task<ReadOnlyMemory<byte>> Write(Stream stream, Guid aggregateId, long commitSequenceNumber, string partitionKey, ReadOnlyMemory<byte> storeMetadata);
     }
 }

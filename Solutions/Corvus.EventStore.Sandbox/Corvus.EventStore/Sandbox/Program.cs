@@ -7,12 +7,9 @@ namespace Corvus.EventStore.Sandbox
     using System;
     using System.Diagnostics;
     using System.Linq;
-    using System.Threading;
     using System.Threading.Tasks;
+    using Corvus.EventStore.AzureBlob;
     using Corvus.EventStore.AzureCosmos;
-    using Corvus.EventStore.Json;
-    using Corvus.EventStore.Sandbox.Mementos;
-    using Corvus.EventStore.Sandbox.Simple.Handlers;
     using Microsoft.Extensions.Configuration;
 
     /// <summary>
@@ -27,30 +24,39 @@ namespace Corvus.EventStore.Sandbox
         /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
         public static async Task Main(string[] args)
         {
-            Console.WriteLine("Running with Cosmos in Azure");
             IConfigurationBuilder builder = new ConfigurationBuilder()
                 .AddJsonFile($"local.settings.json", true, true);
 
             IConfigurationRoot config = builder.Build();
 
-            string connectionstring = config.GetConnectionString("CosmosConnectionString");
+            await SimpleCosmos(config).ConfigureAwait(false);
 
-            var eventStore = CosmosEventStore.GetInstance(connectionstring, "corvuseventstore", "corvusevents", NullSnapshotReader.Instance);
+            Console.ReadKey();
 
-            ////var cts = new CancellationTokenSource();
-            ////var eventFeedHandler = new ToDoListEventFeedHandler();
-            ////Task feedTask = eventStore.ReadFeed(eventFeedHandler, 100, null, cts.Token);
+            ////await WriteVolumeCosmos(config).ConfigureAwait(false);
+
+            ////Console.ReadKey();
+
+            await SimpleAzureBlob(config).ConfigureAwait(false);
+        }
+
+        private static async Task SimpleAzureBlob(IConfigurationRoot config)
+        {
+            Console.WriteLine("Running with AzureBlob in Azure");
+            string connectionstring = config.GetConnectionString("BlobStorageConnectionString");
+
+            var eventStore = AzureBlobEventStore.GetInstance(connectionstring, "corvusevents", NullSnapshotReader.Instance);
 
             var toDoListId = Guid.NewGuid();
 
             // Read and modify a todoitem using the simple aggregate.
-            ToDoList<JsonAggregateRoot<ToDoListMemento, CosmosJsonStore>> toDoList = await ToDoList.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
+            ToDoList toDoList = await ToDoList.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
 
             toDoList = toDoList.Initialize(DateTimeOffset.Now, "Bill Gates");
             toDoList = await toDoList.Commit().ConfigureAwait(false);
 
             // Now load it using the "json-specific" aggregate.
-            ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>> toDoListJson = await ToDoListJson.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
+            ToDoListJson toDoListJson = await ToDoListJson.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
             toDoListJson = toDoListJson.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
             toDoListJson = toDoListJson.AddToDoItem(Guid.NewGuid(), "This is my second title", "This is my second description");
             toDoListJson = await toDoListJson.Commit().ConfigureAwait(false);
@@ -64,18 +70,47 @@ namespace Corvus.EventStore.Sandbox
             // Reload the toDoListJson
             toDoListJson = await ToDoListJson.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
 
-            Console.ReadKey();
-
-            ////cts.Cancel();
-            ////await feedTask.ConfigureAwait(false);
-
-            ////Console.WriteLine($"Seen {eventFeedHandler.TotalCommitCount} commits containing {eventFeedHandler.TotalEventCount} events.");
-            await WriteVolume(connectionstring).ConfigureAwait(false);
+            Console.WriteLine("Finished running with AzureBlob in Azure");
         }
 
-        private static async Task WriteVolume(string connectionString)
+        private static async Task SimpleCosmos(IConfigurationRoot config)
         {
-            var eventStore = CosmosEventStore.GetInstance(connectionString, "corvuseventstore", "corvusevents", NullSnapshotReader.Instance);
+            Console.WriteLine("Running with Cosmos in Azure");
+            string connectionstring = config.GetConnectionString("CosmosConnectionString");
+
+            var eventStore = CosmosEventStore.GetInstance(connectionstring, "corvuseventstore", "corvusevents", NullSnapshotReader.Instance);
+
+            var toDoListId = Guid.NewGuid();
+
+            // Read and modify a todoitem using the simple aggregate.
+            ToDoList toDoList = await ToDoList.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
+
+            toDoList = toDoList.Initialize(DateTimeOffset.Now, "Bill Gates");
+            toDoList = await toDoList.Commit().ConfigureAwait(false);
+
+            // Now load it using the "json-specific" aggregate.
+            ToDoListJson toDoListJson = await ToDoListJson.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
+            toDoListJson = toDoListJson.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
+            toDoListJson = toDoListJson.AddToDoItem(Guid.NewGuid(), "This is my second title", "This is my second description");
+            toDoListJson = await toDoListJson.Commit().ConfigureAwait(false);
+
+            // Reload the toDoList
+            toDoList = await ToDoList.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
+            toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is another title", "This is another description");
+            toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is yet another title", "This is yet another description");
+            toDoList = await toDoList.Commit().ConfigureAwait(false);
+
+            // Reload the toDoListJson
+            toDoListJson = await ToDoListJson.ReadOrCreate(eventStore, toDoListId).ConfigureAwait(false);
+
+            Console.WriteLine("Finished running with Cosmos in Azure");
+        }
+
+        private static async Task WriteVolumeCosmos(IConfigurationRoot config)
+        {
+            string connectionstring = config.GetConnectionString("CosmosConnectionString");
+
+            var eventStore = CosmosEventStore.GetInstance(connectionstring, "corvuseventstore", "corvusevents", NullSnapshotReader.Instance);
 
             // This is the ID of our aggregate - imagine this came in from the request, for example.
             Guid[] aggregateIds = Enumerable.Range(0, 650)
@@ -89,11 +124,11 @@ namespace Corvus.EventStore.Sandbox
             const int minTimePerIteration = 1000;
             const int eventsPerCommit = 8;
 
-            var aggregates = new ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>>[aggregateIds.Length];
+            var aggregates = new ToDoListJson[aggregateIds.Length];
 
             Console.WriteLine("Initializing aggregates.");
 
-            var initTaskList = new Task<ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>>>[initializationBatchSize];
+            var initTaskList = new Task<ToDoListJson>[initializationBatchSize];
 
             var loadSw = Stopwatch.StartNew();
             for (int i = 0; i < (int)Math.Ceiling((double)aggregateIds.Length / initializationBatchSize); ++i)
@@ -104,7 +139,7 @@ namespace Corvus.EventStore.Sandbox
                     initTaskList[index] = ToDoListJson.ReadOrCreate(eventStore, id);
                 }
 
-                ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>>[] results = await Task.WhenAll(initTaskList).ConfigureAwait(false);
+                ToDoListJson[] results = await Task.WhenAll(initTaskList).ConfigureAwait(false);
                 results.CopyTo(aggregates, initializationBatchSize * i);
             }
 
@@ -116,7 +151,7 @@ namespace Corvus.EventStore.Sandbox
 
             var executeSw = Stopwatch.StartNew();
 
-            var taskList = new Task<ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>>>[batchSize];
+            var taskList = new Task<ToDoListJson>[batchSize];
 
             for (int i = 0; i < iterations; ++i)
             {
@@ -133,7 +168,7 @@ namespace Corvus.EventStore.Sandbox
                     {
                         for (int taskCount = 0; taskCount < batchSize; ++taskCount)
                         {
-                            ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>> toDoList = aggregates[(batch * batchSize) + taskCount];
+                            ToDoListJson toDoList = aggregates[(batch * batchSize) + taskCount];
                             for (int eventCount = 0; eventCount < eventsPerCommit; ++eventCount)
                             {
                                 toDoList = toDoList.AddToDoItem(Guid.NewGuid(), "This is my title", "This is my description");
@@ -142,7 +177,7 @@ namespace Corvus.EventStore.Sandbox
                             taskList[taskCount] = toDoList.Commit();
                         }
 
-                        ToDoListJson<JsonAggregateRoot<ToDoListMementoJson, CosmosJsonStore>>[] batchAggregates = await Task.WhenAll(taskList).ConfigureAwait(false);
+                        ToDoListJson[] batchAggregates = await Task.WhenAll(taskList).ConfigureAwait(false);
                         batchAggregates.CopyTo(aggregates, batch * batchSize);
                     }
 

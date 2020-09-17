@@ -1,4 +1,4 @@
-﻿// <copyright file="JsonAggregateRoot{TMemento,TJsonStore}.cs" company="Endjin Limited">
+﻿// <copyright file="JsonAggregateRoot{TMemento}.cs" company="Endjin Limited">
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
@@ -14,20 +14,18 @@ namespace Corvus.EventStore.Json
     using Corvus.Extensions;
 
     /// <summary>
-    /// An aggregate root implemented over an <see cref="IJsonStore"/>.
+    /// An aggregate root implemented over an <see cref="IStreamStore"/>.
     /// </summary>
     /// <typeparam name="TMemento">The type of the internal memento for the aggregate root.</typeparam>
-    /// <typeparam name="TJsonStore">The type of the Json Store to be used by this aggregate root.</typeparam>
-    public readonly struct JsonAggregateRoot<TMemento, TJsonStore> : IJsonAggregateRoot<TMemento, JsonAggregateRoot<TMemento, TJsonStore>>
-        where TJsonStore : IJsonStore
+    public readonly struct JsonAggregateRoot<TMemento> : IAggregateRoot<TMemento>
     {
-        private readonly TJsonStore jsonStore;
+        private readonly IStreamStore jsonStore;
         private readonly ArrayBufferWriter<byte> bufferWriter;
         private readonly Utf8JsonWriter utf8JsonWriter;
         private readonly JsonSerializerOptions options;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="JsonAggregateRoot{TMemento,TJsonStore}"/> struct.
+        /// Initializes a new instance of the <see cref="JsonAggregateRoot{TMemento}"/> struct.
         /// </summary>
         /// <param name="id">The unique ID of the aggregate root.</param>
         /// <param name="memento">The current memento.</param>
@@ -38,9 +36,9 @@ namespace Corvus.EventStore.Json
         /// <param name="eventSequenceNumber">The <see cref="EventSequenceNumber"/>.</param>
         /// <param name="commitSequenceNumber">The <see cref="CommitSequenceNumber"/>.</param>
         /// <param name="hasUncommittedEvents">A valut that indicates whether the aggregate has uncommitted events.</param>
-        /// <param name="etag">Etag associated with this instance.</param>
+        /// <param name="storeMetadata">Metadata from the store associated with this instance.</param>
         /// <param name="options">The JSON serializer options for the aggregate root.</param>
-        public JsonAggregateRoot(Guid id, TMemento memento, TJsonStore jsonStore, ArrayBufferWriter<byte> bufferWriter, Utf8JsonWriter utf8JsonWriter, string partitionKey, long eventSequenceNumber, long commitSequenceNumber, bool hasUncommittedEvents, string etag, JsonSerializerOptions options)
+        public JsonAggregateRoot(Guid id, TMemento memento, IStreamStore jsonStore, ArrayBufferWriter<byte> bufferWriter, Utf8JsonWriter utf8JsonWriter, string partitionKey, long eventSequenceNumber, long commitSequenceNumber, bool hasUncommittedEvents, ReadOnlyMemory<byte> storeMetadata, JsonSerializerOptions options)
         {
             this.Id = id;
             this.Memento = memento;
@@ -51,7 +49,7 @@ namespace Corvus.EventStore.Json
             this.EventSequenceNumber = eventSequenceNumber;
             this.CommitSequenceNumber = commitSequenceNumber;
             this.HasUncommittedEvents = hasUncommittedEvents;
-            this.ETag = etag;
+            this.StoreMetadata = storeMetadata;
             this.options = options;
         }
 
@@ -71,7 +69,7 @@ namespace Corvus.EventStore.Json
         public TMemento Memento { get; }
 
         /// <inheritdoc/>
-        public string ETag { get; }
+        public ReadOnlyMemory<byte> StoreMetadata { get; }
 
         /// <inheritdoc/>
         public string PartitionKey { get; }
@@ -114,31 +112,53 @@ namespace Corvus.EventStore.Json
         /// <param name="memento">The starting memento.</param>
         /// <param name="eventHandler">The event handler.</param>
         /// <param name="streamReader">The stream reader.</param>
-        /// <returns>The updated memento, commit sequence number and event sequence number once the events have been processed.</returns>
+        /// <returns>The updated memento and event sequence number and a value which indicates whether a commit has been read, once the events have been processed.</returns>
         public static (TMemento, long) ProcessCommit<TEventHandler>(Guid aggregateId, long commitSequenceNumber, long eventSequenceNumber, in TMemento memento, in TEventHandler eventHandler, ref Utf8JsonStreamReader streamReader)
             where TEventHandler : IJsonEventHandler<TMemento>
         {
-            ValidateCommitAndFindEvents(aggregateId, commitSequenceNumber, ref streamReader);
+            if (!ValidateCommitAndFindEvents(aggregateId, commitSequenceNumber, ref streamReader))
+            {
+                return (memento, eventSequenceNumber);
+            }
 
-            return ProcessEvents(aggregateId, commitSequenceNumber, eventSequenceNumber, memento, eventHandler, ref streamReader);
+            (TMemento m, long e) =  ProcessEvents(aggregateId, commitSequenceNumber, eventSequenceNumber, memento, eventHandler, ref streamReader);
+            return (m, e);
         }
 
         /// <inheritdoc/>
-        public JsonAggregateRoot<TMemento, TJsonStore> ApplyEvent<TPayload>(string eventType, in TPayload payload, IEventHandler<TMemento> eventHandler)
+        IAggregateRoot<TMemento> IAggregateRoot<TMemento>.ApplyEvent<TPayload>(string eventType, in TPayload payload, IEventHandler<TMemento> eventHandler)
         {
             return this.ApplyEvent(JsonEncodedText.Encode(eventType), payload, new JsonSerializerPayloadWriter<TPayload>(this.options), new JsonEventHandlerOverJsonSerializer(eventHandler, this.options));
         }
 
-        /// <inheritdoc/>
-        public JsonAggregateRoot<TMemento, TJsonStore> ApplyEvent<TPayload, TEventHandler>(JsonEncodedText eventType, in TPayload payload, in TEventHandler eventHandler)
+        /// <summary>
+        /// Apply an event using the JSON handlers.
+        /// </summary>
+        /// <typeparam name="TPayload">The type of the event payload.</typeparam>
+        /// <typeparam name="TEventHandler">The type of the <see cref="IJsonEventHandler{TMemento}"/>.</typeparam>
+        /// <param name="eventType">The type of the event.</param>
+        /// <param name="payload">The payload for the event.</param>
+        /// <param name="eventHandler">The <see cref="IJsonEventHandler{TMemento}"/>.</param>
+        /// <returns>The aggregate root with the event applied.</returns>
+        public JsonAggregateRoot<TMemento> ApplyEvent<TPayload, TEventHandler>(JsonEncodedText eventType, in TPayload payload, in TEventHandler eventHandler)
             where TPayload : IJsonEventPayloadWriter<TPayload>
             where TEventHandler : IJsonEventHandler<TMemento>
         {
             return this.ApplyEvent(eventType, payload, payload, eventHandler);
         }
 
-        /// <inheritdoc/>
-        public JsonAggregateRoot<TMemento, TJsonStore> ApplyEvent<TPayload, TPayloadWriter, TEventHandler>(JsonEncodedText eventType, in TPayload payload, in TPayloadWriter payloadWriter, in TEventHandler eventHandler)
+        /// <summary>
+        /// Apply an event using the JSON handlers.
+        /// </summary>
+        /// <typeparam name="TPayload">The type of the event payload.</typeparam>
+        /// <typeparam name="TPayloadWriter">The type of the <see cref="IJsonEventPayloadWriter{TPayload}"/>.</typeparam>
+        /// <typeparam name="TEventHandler">The type of the <see cref="IJsonEventHandler{TMemento}"/>.</typeparam>
+        /// <param name="eventType">The type of the event.</param>
+        /// <param name="payload">The payload for the event.</param>
+        /// <param name="payloadWriter">The <see cref="IJsonEventPayloadWriter{TPayload}"/>.</param>
+        /// <param name="eventHandler">The <see cref="IJsonEventHandler{TMemento}"/>.</param>
+        /// <returns>The aggregate root with the event applied.</returns>
+        public JsonAggregateRoot<TMemento> ApplyEvent<TPayload, TPayloadWriter, TEventHandler>(JsonEncodedText eventType, in TPayload payload, in TPayloadWriter payloadWriter, in TEventHandler eventHandler)
             where TPayloadWriter : IJsonEventPayloadWriter<TPayload>
             where TEventHandler : IJsonEventHandler<TMemento>
         {
@@ -151,22 +171,31 @@ namespace Corvus.EventStore.Json
 
             TMemento memento = eventHandler.HandleEvent(this.Id, this.CommitSequenceNumber, eventType, this.EventSequenceNumber + 1, this.Memento, payload);
 
-            return new JsonAggregateRoot<TMemento, TJsonStore>(this.Id, memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.PartitionKey, this.EventSequenceNumber + 1, this.CommitSequenceNumber, true, this.ETag, this.options);
+            return new JsonAggregateRoot<TMemento>(this.Id, memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.PartitionKey, this.EventSequenceNumber + 1, this.CommitSequenceNumber, true, this.StoreMetadata, this.options);
         }
 
         /// <inheritdoc/>
-        public async Task<JsonAggregateRoot<TMemento, TJsonStore>> Commit()
+        async Task<IAggregateRoot<TMemento>> IAggregateRoot<TMemento>.Commit()
+        {
+            return await this.CommitJson().ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Commit the event.
+        /// </summary>
+        /// <returns>A <see cref="Task{TResult}"/> which when complete provides the committed <see cref="JsonAggregateRoot{TMemento}"/>.</returns>
+        public async Task<JsonAggregateRoot<TMemento>> CommitJson()
         {
             WriteEndCommit(this.utf8JsonWriter);
 
             using var stream = new ReadOnlyMemoryStream(this.bufferWriter.WrittenMemory);
 
-            await this.jsonStore.Write(stream, this.Id, this.CommitSequenceNumber + 1, this.PartitionKey, this.ETag).ConfigureAwait(false);
+            ReadOnlyMemory<byte> storeMetadata = await this.jsonStore.Write(stream, this.Id, this.CommitSequenceNumber + 1, this.PartitionKey, this.StoreMetadata).ConfigureAwait(false);
 
             this.bufferWriter.Clear();
             this.utf8JsonWriter.Reset();
 
-            return new JsonAggregateRoot<TMemento, TJsonStore>(this.Id, this.Memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.PartitionKey, this.EventSequenceNumber, this.CommitSequenceNumber + 1, false, this.ETag, this.options);
+            return new JsonAggregateRoot<TMemento>(this.Id, this.Memento, this.jsonStore, this.bufferWriter, this.utf8JsonWriter, this.PartitionKey, this.EventSequenceNumber, this.CommitSequenceNumber + 1, false, storeMetadata, this.options);
         }
 
         /// <summary>
@@ -249,8 +278,13 @@ namespace Corvus.EventStore.Json
         /// <remarks>
         /// This leaves the reader at the start of the events array.
         /// </remarks>
-        private static void ValidateCommitAndFindEvents(Guid aggregateId, long commitSequenceNumber, ref Utf8JsonStreamReader streamReader)
+        private static bool ValidateCommitAndFindEvents(Guid aggregateId, long commitSequenceNumber, ref Utf8JsonStreamReader streamReader)
         {
+            if (streamReader.TokenType == JsonTokenType.None)
+            {
+                return false;
+            }
+
             if (streamReader.TokenType != JsonTokenType.StartObject)
             {
                 throw new JsonException("Expected to find the start of a Commit object");
@@ -317,6 +351,8 @@ namespace Corvus.EventStore.Json
             {
                 throw new JsonException($"Expected the {JsonCommit.EventsPropertyNameString} property to be an array of event objects.");
             }
+
+            return true;
         }
 
         private static void FindNextCommit(ref Utf8JsonStreamReader streamReader)
@@ -393,7 +429,7 @@ namespace Corvus.EventStore.Json
         /// <summary>
         /// This wraps a regular event handler with a JsonPayloadSerializer
         /// It allows for the simpler but less efficient model offered by
-        /// IEventStore/IAggregateRoot, rather than the model used by this IJsonAggregateRoot/IJsonEventStore
+        /// IEventStore/IAggregateRoot, rather than the model used by this IJsonAggregateRoot/IEventStore
         /// It allocates extra strings for e.g. event types and RAW JsonElement data,
         /// and parses entire events into memory when that may not be
         /// necessary.

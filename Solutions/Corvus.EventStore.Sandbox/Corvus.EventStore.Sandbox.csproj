@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Corvus.EventStore.AzureBlob\Corvus.EventStore.AzureBlob.csproj" />
     <ProjectReference Include="..\Corvus.EventStore.AzureCosmos\Corvus.EventStore.AzureCosmos.csproj" />
     <ProjectReference Include="..\Corvus.EventStore\Corvus.EventStore.csproj" />
   </ItemGroup>

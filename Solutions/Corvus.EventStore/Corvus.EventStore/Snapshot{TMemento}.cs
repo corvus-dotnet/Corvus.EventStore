@@ -4,6 +4,8 @@
 
 namespace Corvus.EventStore
 {
+    using System;
+
     /// <summary>
     /// A snapshot read by a <see cref="ISnapshotReader"/>.
     /// </summary>
@@ -15,13 +17,20 @@ namespace Corvus.EventStore
         /// </summary>
         /// <param name="commitSequenceNumber">The <see cref="CommitSequenceNumber"/>.</param>
         /// <param name="eventSequenceNumber">The <see cref="EventSequenceNumber"/>.</param>
+        /// <param name="storeMetadata">The <see cref="StoreMetadata"/>.</param>
         /// <param name="memento">The <see cref="Memento"/>.</param>
-        public Snapshot(long commitSequenceNumber, long eventSequenceNumber, TMemento memento)
+        public Snapshot(long commitSequenceNumber, long eventSequenceNumber, ReadOnlyMemory<byte> storeMetadata, TMemento memento)
         {
             this.CommitSequenceNumber = commitSequenceNumber;
             this.EventSequenceNumber = eventSequenceNumber;
             this.Memento = memento;
+            this.StoreMetadata = storeMetadata;
         }
+
+        /// <summary>
+        /// Gets the store index for the record.
+        /// </summary>
+        public ReadOnlyMemory<byte> StoreMetadata { get; }
 
         /// <summary>
         /// Gets the commit sequence number for this snapshot.

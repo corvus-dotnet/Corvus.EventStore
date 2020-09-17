@@ -1,4 +1,4 @@
-﻿// <copyright file="ContainerFactory.cs" company="Endjin Limited">
+﻿// <copyright file="ContainerClientFactory.cs" company="Endjin Limited">
 // Copyright (c) Endjin Limited. All rights reserved.
 // </copyright>
 
@@ -9,17 +9,17 @@ namespace Corvus.EventStore.AzureBlob
     /// <summary>
     /// Standard container factory for an AzureBlobEventStore.
     /// </summary>
-    public readonly struct ContainerFactory : IContainerClientFactory
+    public readonly struct ContainerClientFactory : IContainerClientFactory
     {
         private readonly BlobServiceClient client;
         private readonly BlobContainerClient container;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ContainerFactory"/> struct.
+        /// Initializes a new instance of the <see cref="ContainerClientFactory"/> struct.
         /// </summary>
         /// <param name="connectionString">The connection string to use.</param>
         /// <param name="containerName">The container name to use.</param>
-        public ContainerFactory(string connectionString, string containerName)
+        public ContainerClientFactory(string connectionString, string containerName)
             : this()
         {
             this.ContainerName = containerName;
