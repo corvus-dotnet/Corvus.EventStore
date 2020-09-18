@@ -17,6 +17,8 @@ namespace Corvus.EventStore.Sandbox
     /// </summary>
     public class Program
     {
+        private static readonly Guid InterestingId = Guid.Parse("01a8a6a1-24ea-4a7f-9be9-2d40d3b6b49d");
+
         /// <summary>
         /// Main entry point.
         /// </summary>
@@ -29,15 +31,24 @@ namespace Corvus.EventStore.Sandbox
 
             IConfigurationRoot config = builder.Build();
 
-            await SimpleCosmos(config).ConfigureAwait(false);
+            await ReadBlobAzure(config, InterestingId).ConfigureAwait(false);
 
             Console.ReadKey();
+        }
 
-            ////await WriteVolumeCosmos(config).ConfigureAwait(false);
+        private static async Task ReadBlobAzure(IConfigurationRoot config, Guid id)
+        {
+            Console.WriteLine("Running with AzureBlob in Azure");
+            string connectionstring = config.GetConnectionString("BlobStorageConnectionString");
 
-            ////Console.ReadKey();
+            var eventStore = AzureBlobEventStore.GetInstance(connectionstring, "corvusevents", NullSnapshotReader.Instance);
 
-            await SimpleAzureBlob(config).ConfigureAwait(false);
+            var sw = Stopwatch.StartNew();
+
+            ToDoListJson root = await ToDoListJson.ReadOrCreate(eventStore, id).ConfigureAwait(false);
+            sw.Stop();
+
+            Console.WriteLine($"Read an aggregate root with {root.CommitSequenceNumber} commits and {root.EventSequenceNumber} events in {sw.ElapsedMilliseconds}ms");
         }
 
         private static async Task SimpleAzureBlob(IConfigurationRoot config)
@@ -111,39 +122,30 @@ namespace Corvus.EventStore.Sandbox
         private static async Task ExecuteVolume(IJsonEventStore eventStore)
         {
             // This is the ID of our aggregate - imagine this came in from the request, for example.
-            Guid[] aggregateIds = Enumerable.Range(0, 650)
+            Guid[] aggregateIds = Enumerable.Range(0, 625)
                 .Select(i => Guid.NewGuid())
                 .ToArray();
 
-            const int batchSize = 50;
-            const int initializationBatchSize = 50;
+            const int batchSize = 625;
             const int iterations = 50;
             const int nodesPerAggregate = 8;
-            const int minTimePerIteration = 1000;
+            const int minTimePerIteration = 0;
             const int eventsPerCommit = 8;
 
             var aggregates = new ToDoListJson[aggregateIds.Length];
 
             Console.WriteLine("Initializing aggregates.");
 
-            var initTaskList = new Task<ToDoListJson>[initializationBatchSize];
-
             var loadSw = Stopwatch.StartNew();
-            for (int i = 0; i < (int)Math.Ceiling((double)aggregateIds.Length / initializationBatchSize); ++i)
+            for (int i = 0; i < aggregateIds.Length; ++i)
             {
-                for (int index = 0; index < initializationBatchSize; ++index)
-                {
-                    Guid id = aggregateIds[(initializationBatchSize * i) + index];
-                    initTaskList[index] = ToDoListJson.ReadOrCreate(eventStore, id);
-                }
-
-                ToDoListJson[] results = await Task.WhenAll(initTaskList).ConfigureAwait(false);
-                results.CopyTo(aggregates, initializationBatchSize * i);
+                    Guid id = aggregateIds[i];
+                    aggregates[i] = ToDoListJson.Create(eventStore, id);
             }
 
             loadSw.Stop();
 
-            Console.WriteLine($"Readed {aggregateIds.Length} aggregates in {loadSw.ElapsedMilliseconds / 1000.0} seconds ({aggregateIds.Length / (loadSw.ElapsedMilliseconds / 1000.0)} agg/sec)");
+            Console.WriteLine($"Read {aggregateIds.Length} aggregates in {loadSw.ElapsedMilliseconds / 1000.0} seconds ({aggregateIds.Length / (loadSw.ElapsedMilliseconds / 1000.0)} agg/sec)");
 
             Console.WriteLine();
 

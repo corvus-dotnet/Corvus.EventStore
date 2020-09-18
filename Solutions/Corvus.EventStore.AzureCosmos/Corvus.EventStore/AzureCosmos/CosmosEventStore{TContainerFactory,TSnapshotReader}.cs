@@ -69,6 +69,35 @@ namespace Corvus.EventStore.AzureCosmos
         }
 
         /// <inheritdoc/>
+        IAggregateRoot<TMemento> IEventStore.Create<TMemento>(Guid id, TMemento emptyMemento, IEventHandler<TMemento> eventHandler)
+        {
+            return this.Create(id, emptyMemento, new JsonAggregateRoot<TMemento>.JsonEventHandlerOverJsonSerializer(eventHandler, this.Options));
+        }
+
+        /// <inheritdoc/>
+        IAggregateRoot<TMemento> IEventStore.Create<TMemento>(Guid id, string partitionKey, TMemento emptyMemento, IEventHandler<TMemento> eventHandler)
+        {
+            return this.Create(id, partitionKey, emptyMemento, new JsonAggregateRoot<TMemento>.JsonEventHandlerOverJsonSerializer(eventHandler, this.Options));
+        }
+
+        /// <inheritdoc/>
+        public JsonAggregateRoot<TMemento> Create<TMemento, TEventHandler>(Guid id, TMemento emptyMemento, TEventHandler eventHandler)
+            where TEventHandler : IJsonEventHandler<TMemento>
+        {
+            return this.Create(id, id.ToString(), emptyMemento, eventHandler);
+        }
+
+        /// <inheritdoc/>
+        public JsonAggregateRoot<TMemento> Create<TMemento, TEventHandler>(Guid id, string partitionKey, TMemento emptyMemento, TEventHandler eventHandler)
+            where TEventHandler : IJsonEventHandler<TMemento>
+        {
+            var bufferWriter = new ArrayBufferWriter<byte>();
+            var utf8JsonWriter = new Utf8JsonWriter(bufferWriter, new JsonWriterOptions { Encoder = this.Options.Encoder, Indented = this.Options.WriteIndented, SkipValidation = false });
+
+            return new JsonAggregateRoot<TMemento>(id, emptyMemento, this.jsonStore, bufferWriter, utf8JsonWriter, partitionKey, -1, -1, false, ReadOnlyMemory<byte>.Empty, this.Options);
+        }
+
+        /// <inheritdoc/>
         public Task<JsonAggregateRoot<TMemento>> Read<TMemento, TEventHandler>(Guid id, TMemento emptyMemento, TEventHandler eventHandler)
             where TEventHandler : IJsonEventHandler<TMemento>
         {

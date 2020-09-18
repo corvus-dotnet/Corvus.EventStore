@@ -44,6 +44,18 @@ namespace Corvus.EventStore.Sandbox
         }
 
         /// <summary>
+        /// Fast path to create a to-do list from an event store.
+        /// </summary>
+        /// <param name="eventStore">The event store from which to load the todo list.</param>
+        /// <param name="toDoListId">The ID for the todo list.</param>
+        /// <returns>A <see cref="Task{ToDoList}"/> which, when complete, provides the <see cref="ToDoList"/>.</returns>
+        public static ToDoList Create(IEventStore eventStore, Guid toDoListId)
+        {
+            IAggregateRoot<ToDoListMemento> aggregateRoot = eventStore.Create(toDoListId, ToDoListMemento.Empty, ToDoListEventHandler.Instance);
+            return new ToDoList(aggregateRoot);
+        }
+
+        /// <summary>
         /// Initialize the ToDo list with a start date and an owner.
         /// </summary>
         /// <param name="startDate">The starting date for items in the ToDo list.</param>

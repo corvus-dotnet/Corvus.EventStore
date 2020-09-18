@@ -21,6 +21,11 @@ namespace Corvus.EventStore.AzureBlob
     /// </summary>
     public class AzureBlobStreamStore : IStreamStore
     {
+        /// <summary>
+        /// This is an illegal UTF8 byte sequence, so it is good as a separator.
+        /// </summary>
+        internal static readonly ReadOnlyMemory<byte> Utf8BlockSeparator = new ReadOnlyMemory<byte>(new byte[] { 0x84, 0xDD });
+
         private static readonly AppendBlobRequestConditions ConditionsForCreate = new AppendBlobRequestConditions { IfNoneMatch = ETag.All };
         private static readonly AppendBlobCreateOptions CreateOptions = new AppendBlobCreateOptions { Conditions = ConditionsForCreate };
 
@@ -45,13 +50,18 @@ namespace Corvus.EventStore.AzureBlob
             try
             {
                 long initialPosition = stream.Position;
+                Stream streamToWrite = stream;
 
                 if (commitSequenceNumber == 0)
                 {
                     await appendBlobClient.CreateAsync(CreateOptions).ConfigureAwait(false);
                 }
+                else
+                {
+                    streamToWrite = new AppendStream(stream, Utf8BlockSeparator, ReadOnlyMemory<byte>.Empty);
+                }
 
-                Response<BlobAppendInfo> response = await appendBlobClient.AppendBlockAsync(stream, conditions: conditions).ConfigureAwait(false);
+                Response<BlobAppendInfo> response = await appendBlobClient.AppendBlockAsync(streamToWrite, conditions: conditions).ConfigureAwait(false);
                 long bytesWritten = stream.Position - initialPosition;
                 long offset = long.Parse(response.Value.BlobAppendOffset);
                 return GetMetadata(offset + bytesWritten, response.Value.ETag);

@@ -37,6 +37,16 @@ namespace Corvus.EventStore.Sandbox
         public Guid Id => this.aggregateRoot.Id;
 
         /// <summary>
+        /// Gets the current internal commit sequence number.
+        /// </summary>
+        internal long CommitSequenceNumber => this.aggregateRoot.CommitSequenceNumber;
+
+        /// <summary>
+        /// Gets the current internal commit sequence number.
+        /// </summary>
+        internal long EventSequenceNumber => this.aggregateRoot.EventSequenceNumber;
+
+        /// <summary>
         /// Read a to-do list from a JSON store.
         /// </summary>
         /// <typeparam name="TEventStore">The type of the event store.</typeparam>
@@ -46,7 +56,21 @@ namespace Corvus.EventStore.Sandbox
         public static async Task<ToDoListJson> ReadOrCreate<TEventStore>(TEventStore eventStore, Guid toDoListId)
             where TEventStore : IJsonEventStore
         {
-            JsonAggregateRoot<ToDoListMementoJson> aggregateRoot = await eventStore.Read(toDoListId, toDoListId.ToString(), ToDoListMementoJson.Empty, ToDoListJsonEventHandler.Instance).ConfigureAwait(false);
+            JsonAggregateRoot<ToDoListMementoJson> aggregateRoot = await eventStore.Read(toDoListId, ToDoListMementoJson.Empty, ToDoListJsonEventHandler.Instance).ConfigureAwait(false);
+            return new ToDoListJson(aggregateRoot);
+        }
+
+        /// <summary>
+        /// Fast path to create a to-do list from an event store.
+        /// </summary>
+        /// <typeparam name="TEventStore">The type of the event store.</typeparam>
+        /// <param name="eventStore">The event store from which to load the todo list.</param>
+        /// <param name="toDoListId">The ID for the todo list.</param>
+        /// <returns>A <see cref="Task{ToDoList}"/> which, when complete, provides the <see cref="ToDoList"/>.</returns>
+        public static ToDoListJson Create<TEventStore>(TEventStore eventStore, Guid toDoListId)
+            where TEventStore : IJsonEventStore
+        {
+            JsonAggregateRoot<ToDoListMementoJson> aggregateRoot = eventStore.Create(toDoListId, ToDoListMementoJson.Empty, ToDoListJsonEventHandler.Instance);
             return new ToDoListJson(aggregateRoot);
         }
 

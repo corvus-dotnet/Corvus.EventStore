@@ -69,6 +69,35 @@ namespace Corvus.EventStore.AzureBlob
         }
 
         /// <inheritdoc/>
+        IAggregateRoot<TMemento> IEventStore.Create<TMemento>(Guid id, TMemento emptyMemento, IEventHandler<TMemento> eventHandler)
+        {
+            return this.Create(id, emptyMemento, new JsonAggregateRoot<TMemento>.JsonEventHandlerOverJsonSerializer(eventHandler, this.Options));
+        }
+
+        /// <inheritdoc/>
+        IAggregateRoot<TMemento> IEventStore.Create<TMemento>(Guid id, string partitionKey, TMemento emptyMemento, IEventHandler<TMemento> eventHandler)
+        {
+            return this.Create(id, partitionKey, emptyMemento, new JsonAggregateRoot<TMemento>.JsonEventHandlerOverJsonSerializer(eventHandler, this.Options));
+        }
+
+        /// <inheritdoc/>
+        public JsonAggregateRoot<TMemento> Create<TMemento, TEventHandler>(Guid id, TMemento emptyMemento, TEventHandler eventHandler)
+            where TEventHandler : IJsonEventHandler<TMemento>
+        {
+            return this.Create(id, id.ToString(), emptyMemento, eventHandler);
+        }
+
+        /// <inheritdoc/>
+        public JsonAggregateRoot<TMemento> Create<TMemento, TEventHandler>(Guid id, string partitionKey, TMemento emptyMemento, TEventHandler eventHandler)
+            where TEventHandler : IJsonEventHandler<TMemento>
+        {
+            var bufferWriter = new ArrayBufferWriter<byte>();
+            var utf8JsonWriter = new Utf8JsonWriter(bufferWriter, new JsonWriterOptions { Encoder = this.Options.Encoder, Indented = this.Options.WriteIndented, SkipValidation = false });
+
+            return new JsonAggregateRoot<TMemento>(id, emptyMemento, this.jsonStore, bufferWriter, utf8JsonWriter, partitionKey, -1, -1, false, ReadOnlyMemory<byte>.Empty, this.Options);
+        }
+
+        /// <inheritdoc/>
         public Task<JsonAggregateRoot<TMemento>> Read<TMemento, TEventHandler>(Guid id, string partitionKey, TMemento emptyMemento, TEventHandler eventHandler)
             where TEventHandler : IJsonEventHandler<TMemento>
         {
@@ -211,14 +240,22 @@ namespace Corvus.EventStore.AzureBlob
         private (TMemento, long, long) ProcessStream<TMemento, TEventHandler>(Guid aggregateId, long commitSequenceNumber, long eventSequenceNumber, TMemento memento, TEventHandler eventHandler, Stream content, long contentLength, int defaultBufferSize)
             where TEventHandler : IJsonEventHandler<TMemento>
         {
-            // We are now at the start of a block of commits to apply
-            while (content.Position < contentLength)
-            {
-                var streamReader = new Utf8JsonStreamReader(content, defaultBufferSize);
-                streamReader.Read();
+            var streamProvider = new StreamProvider(content, contentLength, AzureBlobStreamStore.Utf8BlockSeparator, defaultBufferSize);
 
-                (memento, eventSequenceNumber) = JsonAggregateRoot<TMemento>.ProcessCommit(aggregateId, commitSequenceNumber, eventSequenceNumber, memento, eventHandler, ref streamReader);
-                commitSequenceNumber += 1;
+            while (streamProvider.NextStream(out Stream? stream))
+            {
+                var streamReader = new Utf8JsonStreamReader(stream, defaultBufferSize);
+
+                try
+                {
+                    streamReader.Read();
+                    (memento, eventSequenceNumber) = JsonAggregateRoot<TMemento>.ProcessCommit(aggregateId, commitSequenceNumber, eventSequenceNumber, memento, eventHandler, ref streamReader);
+                    commitSequenceNumber += 1;
+                }
+                finally
+                {
+                    streamReader.Dispose();
+                }
             }
 
             return (memento, commitSequenceNumber, eventSequenceNumber);

@@ -8,6 +8,7 @@ namespace Corvus.EventStore.Json
     using System.Buffers;
     using System.Buffers.Text;
     using System.IO;
+    using System.Text;
     using System.Text.Json;
     using System.Threading.Tasks;
     using Corvus.EventStore;
@@ -121,7 +122,7 @@ namespace Corvus.EventStore.Json
                 return (memento, eventSequenceNumber);
             }
 
-            (TMemento m, long e) =  ProcessEvents(aggregateId, commitSequenceNumber, eventSequenceNumber, memento, eventHandler, ref streamReader);
+            (TMemento m, long e) = ProcessEvents(aggregateId, commitSequenceNumber, eventSequenceNumber, memento, eventHandler, ref streamReader);
             return (m, e);
         }
 
@@ -331,7 +332,7 @@ namespace Corvus.EventStore.Json
                 throw new JsonException($"Expected to find the {JsonCommit.CommitSequenceNumberPropertyNameString} property.");
             }
 
-            // Now read the value of the aggregate ID and validate it
+            // Now read the value of the commit sequence number and validate it
             streamReader.Read();
             if (streamReader.TokenType != JsonTokenType.Number || streamReader.GetInt64() != commitSequenceNumber + 1)
             {
