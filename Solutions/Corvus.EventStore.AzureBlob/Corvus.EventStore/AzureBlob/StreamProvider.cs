@@ -13,7 +13,7 @@ namespace Corvus.EventStore.AzureBlob
     /// Provides a set of streams over an underlying stream,
     /// broken at a given byte sequence as a separator.
     /// </summary>
-    internal class StreamProvider : IDisposable
+    internal struct StreamProvider : IDisposable
     {
         private readonly Stream underlyingStream;
         private readonly ReadOnlyMemory<byte> separator;
@@ -33,11 +33,12 @@ namespace Corvus.EventStore.AzureBlob
         public StreamProvider(Stream underlyingStream, long underlyingStreamLength, ReadOnlyMemory<byte> separator, int bufferSize)
         {
             this.underlyingStream = underlyingStream;
-            this.underlyingStreamLength = underlyingStreamLength;
             this.separator = separator;
             this.bufferSize = bufferSize;
+            this.underlyingStreamLength = underlyingStreamLength;
             this.bufferOwner = MemoryPool<byte>.Shared.Rent(this.bufferSize);
             this.lastPosition = 0;
+            this.bytesRead = 0;
         }
 
         /// <inheritdoc/>

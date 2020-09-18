@@ -240,7 +240,7 @@ namespace Corvus.EventStore.AzureBlob
         private (TMemento, long, long) ProcessStream<TMemento, TEventHandler>(Guid aggregateId, long commitSequenceNumber, long eventSequenceNumber, TMemento memento, TEventHandler eventHandler, Stream content, long contentLength, int defaultBufferSize)
             where TEventHandler : IJsonEventHandler<TMemento>
         {
-            var streamProvider = new StreamProvider(content, contentLength, AzureBlobStreamStore.Utf8BlockSeparator, defaultBufferSize);
+            using var streamProvider = new StreamProvider(content, contentLength, AzureBlobStreamStore.Utf8BlockSeparator, defaultBufferSize);
 
             while (streamProvider.NextStream(out Stream? stream))
             {
