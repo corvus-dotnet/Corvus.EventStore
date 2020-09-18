@@ -8,7 +8,7 @@ namespace Corvus.EventStore.AzureBlob
     using System.IO;
 
     /// <summary>
-    /// A stream which appends content at the end of a stream.
+    /// A stream which appends content at the beginning and/or end of a stream.
     /// </summary>
     internal class AppendStream : Stream
     {

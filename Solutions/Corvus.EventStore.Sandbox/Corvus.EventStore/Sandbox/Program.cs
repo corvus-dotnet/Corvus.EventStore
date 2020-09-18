@@ -139,8 +139,8 @@ namespace Corvus.EventStore.Sandbox
             var loadSw = Stopwatch.StartNew();
             for (int i = 0; i < aggregateIds.Length; ++i)
             {
-                    Guid id = aggregateIds[i];
-                    aggregates[i] = ToDoListJson.Create(eventStore, id);
+                Guid id = aggregateIds[i];
+                aggregates[i] = ToDoListJson.Create(eventStore, id);
             }
 
             loadSw.Stop();
