@@ -9,7 +9,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.AzureCosm
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.Sandbox", "Corvus.EventStore.Sandbox\Corvus.EventStore.Sandbox.csproj", "{6EC074BC-0FF1-44BD-9AB3-8B8BC8AF699E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore.AzureBlob", "Corvus.EventStore.AzureBlob\Corvus.EventStore.AzureBlob.csproj", "{E4D27902-91BF-4A4A-9BDA-EC825ED52196}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Corvus.EventStore.AzureBlob", "Corvus.EventStore.AzureBlob\Corvus.EventStore.AzureBlob.csproj", "{E4D27902-91BF-4A4A-9BDA-EC825ED52196}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Corvus.EventStore.AzureBlob.AllStreamBuilder", "Corvus.EventStore.AzureBlob.AllStreamBuilder\Corvus.EventStore.AzureBlob.AllStreamBuilder.csproj", "{A7EAAF23-2E26-4736-BD59-E4F59732EEE4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{E4D27902-91BF-4A4A-9BDA-EC825ED52196}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E4D27902-91BF-4A4A-9BDA-EC825ED52196}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E4D27902-91BF-4A4A-9BDA-EC825ED52196}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A7EAAF23-2E26-4736-BD59-E4F59732EEE4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A7EAAF23-2E26-4736-BD59-E4F59732EEE4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A7EAAF23-2E26-4736-BD59-E4F59732EEE4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A7EAAF23-2E26-4736-BD59-E4F59732EEE4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

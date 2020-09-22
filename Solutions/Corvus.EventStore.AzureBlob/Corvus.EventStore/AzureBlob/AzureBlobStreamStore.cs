@@ -22,6 +22,11 @@ namespace Corvus.EventStore.AzureBlob
     public class AzureBlobStreamStore : IStreamStore
     {
         /// <summary>
+        /// The name of the AllStream blob.
+        /// </summary>
+        internal const string AllStreamBlob = "corvusallstream";
+
+        /// <summary>
         /// This is an illegal UTF8 byte sequence, so it is good as a separator.
         /// </summary>
         internal static readonly ReadOnlyMemory<byte> Utf8BlockSeparator = new ReadOnlyMemory<byte>(new byte[] { 0x84, 0xDD });

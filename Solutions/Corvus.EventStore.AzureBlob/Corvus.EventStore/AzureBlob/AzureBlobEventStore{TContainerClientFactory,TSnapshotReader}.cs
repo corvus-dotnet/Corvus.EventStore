@@ -8,6 +8,7 @@ namespace Corvus.EventStore.AzureBlob
     using System.Buffers;
     using System.IO;
     using System.Text.Json;
+    using System.Threading;
     using System.Threading.Tasks;
     using Azure;
     using Azure.Storage.Blobs;
@@ -111,33 +112,33 @@ namespace Corvus.EventStore.AzureBlob
             return this.ReadJson(this.ContainerClientFactory.GetContainerClient(), this.SnapshotReader, id, id.ToString(), emptyMemento, eventHandler, this.Options);
         }
 
-        /////// <summary>
-        /////// Reads an event feed.
-        /////// </summary>
-        /////// <param name="eventHandler">The event reader capable of decoding and applying the event payloads for this aggregate root.</param>
-        /////// <param name="pageSizeHint">A hint as to the number of items you get in a page of results.</param>
-        /////// <param name="continuationToken">The (optional) continuation token to resume the feed from a particular point.</param>
-        /////// <param name="cancellationToken">The cancellation token to terminate reading the feed.</param>
-        /////// <returns>A <see cref="Task{TResult}"/> which completes when the feed terminates.</returns>
-        ////public Task ReadFeed(IEventFeedHandler eventHandler, int pageSizeHint, string? continuationToken, CancellationToken cancellationToken)
-        ////{
-        ////    return this.ReadFeed(this.ContainerClientFactory.GetContainerClient(), eventHandler, pageSizeHint, continuationToken, this.Options, cancellationToken);
-        ////}
+        /// <summary>
+        /// Reads an event feed.
+        /// </summary>
+        /// <param name="eventHandler">The event reader capable of decoding and applying the event payloads for this aggregate root.</param>
+        /// <param name="pageSizeHint">A hint as to the number of items you get in a page of results.</param>
+        /// <param name="continuationToken">The (optional) continuation token to resume the feed from a particular point.</param>
+        /// <param name="cancellationToken">The cancellation token to terminate reading the feed.</param>
+        /// <returns>A <see cref="Task{TResult}"/> which completes when the feed terminates.</returns>
+        public Task ReadFeed(IEventFeedHandler eventHandler, int pageSizeHint, string? continuationToken, CancellationToken cancellationToken)
+        {
+            return this.ReadFeed(this.ContainerClientFactory.GetContainerClient(), eventHandler, pageSizeHint, continuationToken, this.Options, cancellationToken);
+        }
 
-        /////// <summary>
-        /////// Reads an aggregate root.
-        /////// </summary>
-        /////// <typeparam name="TEventHandler">The type of the event reader for the aggregate root. This is an <see cref="IJsonEventFeedHandler"/>.</typeparam>
-        /////// <param name="eventHandler">The event reader capable of decoding and applying the event payloads for this aggregate root.</param>
-        /////// <param name="pageSizeHint">A hint as to the number of items you get in a page of results.</param>
-        /////// <param name="continuationToken">The (optional) continuation token to resume the feed from a particular point.</param>
-        /////// <param name="cancellationToken">The cancellation token to terminate reading the feed.</param>
-        /////// <returns>A <see cref="Task{TResult}"/> which completes when the feed terminates.</returns>
-        ////public Task ReadFeedJson<TEventHandler>(TEventHandler eventHandler, int pageSizeHint, string? continuationToken, CancellationToken cancellationToken)
-        ////    where TEventHandler : IJsonEventFeedHandler
-        ////{
-        ////    return this.ReadFeedJson(this.ContainerClientFactory.GetContainerClient(), eventHandler, pageSizeHint, continuationToken, this.Options, cancellationToken);
-        ////}
+        /// <summary>
+        /// Reads an aggregate root.
+        /// </summary>
+        /// <typeparam name="TEventHandler">The type of the event reader for the aggregate root. This is an <see cref="IJsonEventFeedHandler"/>.</typeparam>
+        /// <param name="eventHandler">The event reader capable of decoding and applying the event payloads for this aggregate root.</param>
+        /// <param name="pageSizeHint">A hint as to the number of items you get in a page of results.</param>
+        /// <param name="continuationToken">The (optional) continuation token to resume the feed from a particular point.</param>
+        /// <param name="cancellationToken">The cancellation token to terminate reading the feed.</param>
+        /// <returns>A <see cref="Task{TResult}"/> which completes when the feed terminates.</returns>
+        public Task ReadFeedJson<TEventHandler>(TEventHandler eventHandler, int pageSizeHint, string? continuationToken, CancellationToken cancellationToken)
+            where TEventHandler : IJsonEventFeedHandler
+        {
+            return this.ReadFeedJson(this.ContainerClientFactory.GetContainerClient(), eventHandler, pageSizeHint, continuationToken, this.Options, cancellationToken);
+        }
 
         private Task<JsonAggregateRoot<TMemento>> Read<TMemento>(BlobContainerClient containerClient, TSnapshotReader snapshotReader, Guid id, TMemento emptyMemento, IEventHandler<TMemento> eventHandler, JsonSerializerOptions options)
         {
@@ -191,51 +192,67 @@ namespace Corvus.EventStore.AzureBlob
             return new JsonAggregateRoot<TMemento>(id, memento!, this.jsonStore, bufferWriter, utf8JsonWriter, partitionKey, eventSequenceNumber, commitSequenceNumber, false, metadata, options);
         }
 
-        ////private Task ReadFeed(BlobContainerClient containerClient, IEventFeedHandler eventHandler, int pageSizeHint, string? continuationToken, JsonSerializerOptions options, CancellationToken cancallationToken)
-        ////{
-        ////    return this.ReadFeedJson(containerClient, new JsonEventFeed.JsonEventFeedHandlerOverJsonSerializer(eventHandler, options), pageSizeHint, continuationToken, options, cancallationToken);
-        ////}
+        private Task ReadFeed(BlobContainerClient containerClient, IEventFeedHandler eventHandler, int pageSizeHint, string? continuationToken, JsonSerializerOptions options, CancellationToken cancallationToken)
+        {
+            return this.ReadFeedJson(containerClient, new JsonEventFeed.JsonEventFeedHandlerOverJsonSerializer(eventHandler, options), pageSizeHint, continuationToken, options, cancallationToken);
+        }
 
-        ////private async Task ReadFeedJson<TEventHandler>(BlobContainerClient containerClient, TEventHandler eventHandler, int pageSizeHint, string? continuationToken, JsonSerializerOptions options, CancellationToken cancellationToken)
-        ////     where TEventHandler : IJsonEventFeedHandler
-        ////{
-        ////    var requestOptions = new ChangeFeedRequestOptions { PageSizeHint = pageSizeHint };
-        ////    FeedIterator iterator = containerClient.GetChangeFeedStreamIterator(continuationToken is null ? ChangeFeedStartFrom.Beginning() : ChangeFeedStartFrom.ContinuationToken(continuationToken), requestOptions);
+        private async Task ReadFeedJson<TEventHandler>(BlobContainerClient containerClient, TEventHandler eventHandler, int pageSizeHint, string? checkpoint, JsonSerializerOptions options, CancellationToken cancellationToken)
+             where TEventHandler : IJsonEventFeedHandler
+        {
+            AppendBlobClient blobClient = containerClient.GetAppendBlobClient(AzureBlobStreamStore.AllStreamBlob);
 
-        ////    while (iterator.HasMoreResults && !cancellationToken.IsCancellationRequested)
-        ////    {
-        ////        using ResponseMessage response = await iterator.ReadNextAsync(cancellationToken).ConfigureAwait(false);
+            // TODO: add some backoff policy
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    long head = checkpoint is null ? 0L : long.Parse(checkpoint);
+                    Response<BlobDownloadInfo> response = await blobClient.DownloadAsync(new HttpRange(head)).ConfigureAwait(false);
 
-        ////        if (cancellationToken.IsCancellationRequested)
-        ////        {
-        ////            break;
-        ////        }
+                    try
+                    {
+                        this.ProcessEventFeedStream(eventHandler, response.Value.Content, head, response.Value.ContentLength, options.DefaultBufferSize, pageSizeHint, cancellationToken);
+                    }
+                    finally
+                    {
+                        response.Value.Dispose();
+                    }
+                }
+                catch (RequestFailedException ex) when (ex.Status == 404)
+                {
+                    // NOP - we don't mind a 404; we just return the empty values.
+                }
+            }
+        }
 
-        ////        response.EnsureSuccessStatusCode();
+        private void ProcessEventFeedStream<TEventHandler>(TEventHandler eventHandler, Stream content, long head, long contentLength, int defaultBufferSize, int pageSizeHint, CancellationToken cancellationToken)
+            where TEventHandler : IJsonEventFeedHandler
+        {
+            if (contentLength == 0)
+            {
+                return;
+            }
 
-        ////        this.ProcessEventFeedStream(eventHandler, response.Content, options.DefaultBufferSize, cancellationToken);
-        ////        await eventHandler.HandleBatchComplete(response.ContinuationToken).ConfigureAwait(false);
-        ////    }
-        ////}
+            using var streamProvider = new StreamProvider(content, contentLength, AzureBlobStreamStore.Utf8BlockSeparator, defaultBufferSize);
 
-        ////private void ProcessEventFeedStream<TEventHandler>(TEventHandler eventHandler, Stream content, int defaultBufferSize, CancellationToken cancellationToken)
-        ////    where TEventHandler : IJsonEventFeedHandler
-        ////{
-        ////    var streamReader = new Utf8JsonStreamReader(content, defaultBufferSize);
+            while (streamProvider.NextStream(out Stream? stream) && !cancellationToken.IsCancellationRequested)
+            {
+                var streamReader = new Utf8JsonStreamReader(stream, defaultBufferSize);
 
-        ////    if (!FindDocumentsProperty(ref streamReader))
-        ////    {
-        ////        throw new JsonException("Unable to find the Documents property in the output stream.");
-        ////    }
+                try
+                {
+                    streamReader.Read();
+                    JsonEventFeed.ProcessCommit(eventHandler, ref streamReader, cancellationToken);
+                }
+                finally
+                {
+                    streamReader.Dispose();
+                }
+            }
 
-        ////    if (!FindDocumentsArray(ref streamReader))
-        ////    {
-        ////        throw new JsonException("The Documents propery was expected to be a JSON array.");
-        ////    }
-
-        ////    // We are now at the start of an array of commits
-        ////    JsonEventFeed.ProcessCommits(eventHandler, ref streamReader, cancellationToken);
-        ////}
+            eventHandler.HandleBatchComplete((contentLength + head).ToString("D21"));
+        }
 
         private (TMemento, long, long) ProcessStream<TMemento, TEventHandler>(Guid aggregateId, long commitSequenceNumber, long eventSequenceNumber, TMemento memento, TEventHandler eventHandler, Stream content, long contentLength, int defaultBufferSize)
             where TEventHandler : IJsonEventHandler<TMemento>
